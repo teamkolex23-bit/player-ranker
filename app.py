@@ -466,7 +466,7 @@ def render_xi(chosen_map):
 
     # Format lines, grouped with blank lines
     lines = []
-    group_breaks = {"GK", "LB", "DM", "AML"}  # after these, insert blank line
+    group_breaks = {"GK", "LB", "DM2", "AML"}  # after these, insert blank line
 
     for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
@@ -513,6 +513,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
