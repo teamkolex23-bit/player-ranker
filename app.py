@@ -251,11 +251,16 @@ role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.
 
 # compute weights vector aligned to available_attrs
 selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-# build the weights vector directly from the master mapping so we never rely
-# on `selected_weights` being a dict-like object
-weights = pd.Series([float(WEIGHTS_BY_ROLE.get(role, {}).get(a, 0.0)) for a in available_attrs],
-                    index=available_attrs).reindex(available_attrs).fillna(0.0)
 
+# robustly obtain the role's weight mapping; defensively coerce to dict if needed
+role_weights = WEIGHTS_BY_ROLE.get(role, {})
+if not hasattr(role_weights, "get"):
+    try:
+        role_weights = dict(role_weights)
+    except Exception:
+        role_weights = {}
+weights = pd.Series([float(role_weights.get(a, 0.0)) for a in available_attrs],
+                    index=available_attrs).reindex(available_attrs).fillna(0.0)
 
 # compute Score
 score_values = attrs_norm.values.dot(weights.values.astype(float))
@@ -455,4 +460,5 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
