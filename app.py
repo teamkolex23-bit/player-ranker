@@ -315,55 +315,35 @@ current_scores = attrs_norm.values.dot(weights.values.astype(float))
 df_out = df.copy()
 df_out["Score"] = current_scores
 
-# --- Deduplicate players: keep the row with highest Score; tie-break by Transfer Value; final tie -> random ---
+# --- Deduplicate players by Name (keep the row with the highest Score; tie-break by Transfer Value) ---
+# Ensure we have a consistent comparison key for names (strip, collapse spaces, lowercase, remove accents)
+def _normalize_name_for_key(s):
+    s = "" if pd.isna(s) else str(s)
+    s = s.strip()
+    s = re.sub(r"\s+", " ", s)  # collapse multiple spaces
+    # normalize accents/diacritics (NFKD) then remove non-ascii combining marks
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.category(ch).startswith("M"))
+    return s.lower()
 
-# helper: parse transfer value strings like "€1.2M", "1,200k", "-" into numeric (euros)
-def parse_transfer_value(x):
-    s = "" if pd.isna(x) else str(x).strip()
-    if not s or s == "-" or s.lower() == "n/a":
-        return 0.0
-    
-    # remove currency symbols and spaces but keep digits, dots, commas and k/m
-    s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
-    if s2 == "":
-        return 0.0
-    
-    m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
-    if not m:
-        # fallback: strip non-digits and try float
-        try:
-            return float(re.sub(r'[^0-9\.]', '', s))
-        except Exception:
-            return 0.0
-    
-    num = m.group(1).replace(',', '')
-    try:
-        val = float(num)
-    except Exception:
-        val = 0.0
-    
-    suf = m.group(2).lower()
-    if suf == 'k':
-        val *= 1_000.0
-    elif suf == 'm':
-        val *= 1_000_000.0
-    
-    return val
+# create a stable name key column used only for deduplication
+df_out["_NameKey"] = df_out["Name"].apply(_normalize_name_for_key)
 
-# randomize order so ties aren't always broken the same way
+# randomize order so ties aren't always broken strictly by input order (keeps behavior similar to before)
 df_out = df_out.sample(frac=1, random_state=None).reset_index(drop=True)
 
-# compute numeric transfer value
+# compute numeric transfer value (use your parse_transfer_value function)
 df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_transfer_value)
 
-# sort so best version comes first
+# sort so highest Score wins; secondarily prefer higher Transfer Value
 df_out = df_out.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False])
 
-# drop duplicate Name+Position, keeping the first (highest score, then highest transfer value)
-df_out = df_out.drop_duplicates(subset=["Name"], keep="first").reset_index(drop=True)
+# now drop duplicates by the normalized name key, keeping the first (highest Score, then highest transfer)
+df_out = df_out.drop_duplicates(subset=["_NameKey"], keep="first").reset_index(drop=True)
 
-# cleanup helper column
-df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
+# remove helper columns used for deduplication
+df_out = df_out.drop(columns=["_NameKey", "_TransferValueNum"], errors="ignore")
+# --- end dedupe ---
 
 # final sort by Score for display/export
 df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
@@ -637,3 +617,4 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
