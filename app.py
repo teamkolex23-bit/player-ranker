@@ -260,7 +260,59 @@ if not dfs:
     st.stop()
 
 df = pd.concat(dfs, ignore_index=True)
-df = df.drop_duplicates(subset=["Name", "Position"], ignore_index=True)
+# create main ranked dataframe
+df_out = df.copy()
+df_out["Score"] = current_scores
+
+# --- Deduplicate players: keep the row with highest Score; tie-break by Transfer Value; final tie -> random ---
+# helper: parse transfer value strings like "€1.2M", "1,200k", "-" into numeric (euros)
+def parse_transfer_value(x):
+    s = "" if pd.isna(x) else str(x)
+    s = s.strip()
+    if not s or s == "-" or s.lower() == "n/a":
+        return 0.0
+    # remove currency symbols and spaces but keep digits, dots, commas and k/m
+    s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
+    if s2 == "":
+        return 0.0
+    m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
+    if not m:
+        # fallback: strip non-digits and try float
+        try:
+            return float(re.sub(r'[^0-9\.]', '', s))
+        except Exception:
+            return 0.0
+    num = m.group(1).replace(',', '')
+    try:
+        val = float(num)
+    except Exception:
+        val = 0.0
+    suf = m.group(2).lower()
+    if suf == 'k':
+        val *= 1_000.0
+    elif suf == 'm':
+        val *= 1_000_000.0
+    return val
+
+# randomize rows so exact ties are broken randomly rather than by input order
+df_out = df_out.sample(frac=1, random_state=None).reset_index(drop=True)
+
+# compute transfer numeric and use it as tie-breaker
+df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_transfer_value)
+
+# sort by Score desc then TransferValue desc, then keep first per (Name, Position)
+df_out = df_out.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False])
+df_out = df_out.drop_duplicates(subset=["Name", "Position"], keep="first").reset_index(drop=True)
+
+# cleanup helper column
+df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
+
+# final sort by Score for display/export
+df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
+
+# ranking starts at 1
+ranked = df_out_sorted.copy()
+ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 
 # determine available attributes present in the upload
 available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
@@ -547,6 +599,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
