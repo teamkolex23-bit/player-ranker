@@ -292,17 +292,109 @@ if normalize:
 attrs_df = df[available_attrs].fillna(0).astype(float)
 attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
 
-# compute role scores for the currently selected role (single select box)
+# create main dataframe (will be deduplicated before scoring)
+df_out = df.copy()
+
+# --- Deduplicate players by Name (keep the row with the highest Transfer Value) ---
+# Ensure we have a consistent comparison key for names (strip, collapse spaces, lowercase, remove accents)
+def _normalize_name_for_key(s):
+    if pd.isna(s):
+        return ""
+    s = str(s)
+
+    # replace ALL kinds of unicode whitespace with a normal space
+    s = re.sub(r"\s+", " ", s, flags=re.UNICODE)
+    s = s.strip()
+
+    # normalize accents/diacritics (NFKD) then strip combining marks
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.category(ch).startswith("M"))
+
+    # also remove zero-width characters and non-breaking spaces
+    s = s.replace("\u200b", "").replace("\u200c", "").replace("\u00A0", " ")
+
+    return s.lower()
+
+# create a stable name key column used only for deduplication
+df_out["_NameKey"] = df_out["Name"].apply(_normalize_name_for_key)
+
+def parse_transfer_value(x):
+    """
+    Robustly parse strings like "€1.2M", "1,200k", "£500k", "-" or numeric values into a float (euros).
+    Returns 0.0 for missing/invalid values.
+    """
+    try:
+        if pd.isna(x):
+            return 0.0
+        s = str(x).strip()
+        if not s or s == "-" or s.lower() in {"n/a", "none"}:
+            return 0.0
+
+        # Remove currency symbols and letters except digits, dots, commas and k/m suffixes
+        s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
+        if s2 == "":
+            # fallback: try to find any plain number inside the original string
+            m = re.search(r'(-?\d+(?:\.\d+)?)', s)
+            if m:
+                try:
+                    return float(m.group(1).replace(',', ''))
+                except Exception:
+                    return 0.0
+            return 0.0
+
+        # Match number and optional k/m suffix
+        m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
+        if not m:
+            # try to parse cleaned numeric string
+            try:
+                return float(s2.replace(',', ''))
+            except Exception:
+                return 0.0
+
+        num = m.group(1).replace(',', '')
+        try:
+            val = float(num)
+        except Exception:
+            val = 0.0
+
+        suf = m.group(2).lower()
+        if suf == 'k':
+            val *= 1_000.0
+        elif suf == 'm':
+            val *= 1_000_000.0
+
+        return val
+    except Exception:
+        return 0.0
+
+# compute numeric transfer value for deduplication
+df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_transfer_value)
+
+# sort so highest Transfer Value wins (since we don't have scores yet)
+df_out = df_out.sort_values(by=["_TransferValueNum"], ascending=[False])
+
+# now drop duplicates by the normalized name key, keeping the first (highest Transfer Value)
+df_out = df_out.drop_duplicates(subset=["_NameKey"], keep="first").reset_index(drop=True)
+
+# remove helper columns used for deduplication
+df_out = df_out.drop(columns=["_NameKey", "_TransferValueNum"], errors="ignore")
+# --- end dedupe ---
+
+# Now compute scores on DEDUPLICATED data
 ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
 role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
 
+# Recompute attrs_norm on deduplicated data
+available_attrs_deduped = [a for a in CANONICAL_ATTRIBUTES if a in df_out.columns]
+attrs_df_deduped = df_out[available_attrs_deduped].fillna(0).astype(float)
+attrs_norm_deduped = attrs_df_deduped / float(max_val) if normalize else attrs_df_deduped
+
 selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs_deduped}).reindex(available_attrs_deduped).fillna(0.0)
 
-current_scores = attrs_norm.values.dot(weights.values.astype(float))
+current_scores = attrs_norm_deduped.values.dot(weights.values.astype(float))
 
-# create main ranked dataframe
-df_out = df.copy()
+# Add scores to deduplicated dataframe
 df_out["Score"] = current_scores
 
 # --- Deduplicate players by Name (keep the row with the highest Score; tie-break by Transfer Value) ---
@@ -665,6 +757,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
