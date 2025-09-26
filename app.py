@@ -225,10 +225,6 @@ if not available_attrs:
     st.stop()
 
 # UI: normalization control
-normalize = st.checkbox("Normalize attribute values (divide by max)", value=False)
-max_val = 20.0
-if normalize:
-    max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
 
 attrs_df = df_all[available_attrs].fillna(0).astype(float)
 attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
@@ -458,6 +454,7 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
 
 
