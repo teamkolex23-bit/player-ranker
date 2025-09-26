@@ -226,8 +226,7 @@ if not available_attrs:
 
 # UI: normalization control
 
-attrs_df = df_all[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
+attrs_norm = df_all[available_attrs].fillna(0).astype(float)
 
 # role selection
 ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
@@ -454,6 +453,7 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
 
 
