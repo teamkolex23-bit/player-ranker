@@ -1,21 +1,13 @@
-# app.py
-# Streamlit app: accepts .html or .rtf, parses player table, ranks players using exact weights.
-# Requirements: streamlit pandas numpy striprtf beautifulsoup4
-
 import re
 import numpy as np
 import pandas as pd
 import streamlit as st
-from striprtf.striprtf import rtf_to_text
 from bs4 import BeautifulSoup
 
-st.set_page_config(layout="wide", page_title="Auto Player Ranker (HTML+RTF)")
-st.title("Auto Player Ranker — upload .html or .rtf, pick a role, get ranked players")
-st.markdown("Preferred: upload HTML (table). RTF still supported but HTML is more reliable.")
+st.set_page_config(layout="wide", page_title="Auto Player Ranker (HTML)")
+st.title("Auto Player Ranker — upload an HTML table and pick a role to rank")
+st.markdown("Upload a single HTML file containing a single players table (header row + data rows). Columns must match common Football Manager abbreviations (e.g. `Name`, `Position`, `Age`, `Transfer Value`, `Pac`, `Acc`, `Dri`, ...).")
 
-# -------------------------
-# Weights & attributes (exact chart)
-# -------------------------
 CANONICAL_ATTRIBUTES = [
     "Corners","Crossing","Dribbling","Finishing","First Touch","Free Kick Taking","Heading",
     "Long Shots","Long Throws","Marking","Passing","Penalty Taking","Tackling","Technique",
@@ -23,24 +15,62 @@ CANONICAL_ATTRIBUTES = [
     "Flair","Leadership","Off The Ball","Positioning","Teamwork","Vision","Work Rate",
     "Acceleration","Agility","Balance","Jumping Reach","Natural Fitness","Pace","Stamina","Strength",
     "Weaker Foot","Aerial Reach","Command of Area","Communication","Eccentricity","Handling","Kicking",
-    "One on Ones","Punching (Tendency)","Reflexes","Rushing Out (Tendency)","Throwing"
+    "One on Ones","Punching (Tendency)","Reflexes","Rushing Out (Tendency)","Throwing","Long Shots"
 ]
 
 WEIGHTS_BY_ROLE = {
-    # (truncated here for readability; same full dict as your working app — ensure you paste full dict)
-    "SC": {
-        "Corners":1,"Crossing":2,"Dribbling":5,"Finishing":8,"First Touch":6,"Free Kick Taking":1,"Heading":6,
-        "Long Shots":2,"Long Throws":1,"Marking":1,"Passing":2,"Penalty Taking":1,"Tackling":1,"Technique":4,
-        "Anticipation":5,"Composure":6,"Concentration":2,"Decisions":5,"Off The Ball":6,"Positioning":2,"Teamwork":1,"Vision":2,"Work Rate":2,
-        "Acceleration":10,"Agility":6,"Balance":2,"Jumping Reach":5,"Pace":7,"Stamina":6,"Strength":6,"Weaker Foot":7.5
+    "GK":{
+        "Decisions":10,"Agility":8,"Reflexes":8,"Handling":8,"Concentration":6,"Bravery":6,
+        "Acceleration":6,"Command of Area":6,"Aerial Reach":6,"Positioning":5,"Kicking":5,
+        "Communication":5,"Strength":4,"One on Ones":4,"Pace":3
     },
-    # add other roles here exactly as in your app (GK, DRL, DC, WBRL, DM, MRL, MC, AMRL, AMC)
+    "DL/DR":{
+        "Acceleration":7,"Decisions":7,"Agility":6,"Stamina":6,"Pace":5,"Concentration":4,
+        "Strength":4,"Positioning":4,"Tackling":4,"First Touch":3,"Anticipation":3,"Marking":3,
+        "Composure":2,"Bravery":2,"Balance":2
+    },
+    "WBL/WBR":{
+        "Acceleration":8,"Stamina":7,"Pace":6,"Agility":5,"Decisions":5,"Strength":4,
+        "Concentration":3,"Technique":3,"First Touch":3,"Positioning":3,"Anticipation":3,
+        "Tackling":3,"Passing":3,"Crossing":3,"Composure":2
+    },
+    "ML/MR":{
+        "Acceleration":8,"Agility":6,"Pace":6,"Stamina":5,"Decisions":5,"Crossing":5,
+        "Technique":4,"First Touch":4,"Composure":3,"Strength":3,"Work Rate":3,
+        "Anticipation":3,"Vision":3,"Passing":3,"Dribbling":3
+    },
+    "AML/AMR":{
+        "Pace":10,"Acceleration":10,"Stamina":7,"Agility":6,"First Touch":5,"Decisions":5,
+        "Dribbling":5,"Crossing":5,"Technique":4,"Composure":3,"Strength":3,"Work Rate":3,
+        "Anticipation":3,"Vision":3,"Concentration":2
+    },
+    "CB":{
+        "Decisions":10,"Positioning":8,"Marking":8,"Agility":6,"Jumping Reach":6,"Strength":6,
+        "Acceleration":6,"Pace":5,"Anticipation":5,"Tackling":5,"Heading":5,"Concentration":4,
+        "Stamina":3,"Composure":2,"Bravery":2
+    },
+    "DM":{
+        "Decisions":8,"Tackling":7,"Agility":6,"Acceleration":6,"Strength":5,"Positioning":5,
+        "Anticipation":5,"Pace":4,"Stamina":4,"Work Rate":4,"First Touch":4,"Vision":4,
+        "Passing":4,"Concentration":3,"Technique":3
+    },
+    "CM":{
+        "Decisions":7,"Agility":6,"Stamina":6,"Acceleration":6,"First Touch":6,"Vision":6,
+        "Passing":6,"Pace":5,"Strength":4,"Technique":4,"Composure":3,"Work Rate":3,
+        "Positioning":3,"Anticipation":3,"Tackling":3
+    },
+    "AMC":{
+        "Acceleration":9,"Pace":7,"Agility":6,"Stamina":6,"Decisions":6,"Vision":6,
+        "Technique":5,"First Touch":5,"Passing":4,"Composure":3,"Strength":3,"Work Rate":3,
+        "Anticipation":3,"Off The Ball":3,"Long Shots":3
+    },
+    "ST":{
+        "Acceleration":10,"Finishing":8,"Pace":7,"Composure":6,"Agility":6,"Stamina":6,
+        "Strength":6,"First Touch":6,"Off The Ball":6,"Heading":6,"Jumping Reach":5,
+        "Decisions":5,"Anticipation":5,"Dribbling":5,"Technique":4
+    }
 }
 
-# If your WEIGHTS_BY_ROLE in code has the full roles, include them all.
-# -------------------------
-# Abbreviation mapping (HTML/RTF headers -> canonical names)
-# -------------------------
 ABBR_MAP = {
     "Name":"Name","Position":"Position","Inf":"Inf","Age":"Age","Transfer Value":"Transfer Value",
     "Cor":"Corners","Cro":"Crossing","Dri":"Dribbling","Fin":"Finishing","Fir":"First Touch","Fre":"Free Kick Taking",
@@ -52,199 +82,112 @@ ABBR_MAP = {
     "1v1":"One on Ones","Pun":"Punching (Tendency)","Ref":"Reflexes","TRO":"Rushing Out (Tendency)","Thr":"Throwing"
 }
 
-# -------------------------
-# HTML parser (reliable)
-# -------------------------
+
 def parse_players_from_html(html_text):
     soup = BeautifulSoup(html_text, "html.parser")
     table = soup.find("table")
     if table is None:
         return None, "No <table> found in HTML."
-    # Get header cells (first row with th or first tr)
-    header_cells = []
+
+    # header
     header_row = table.find("tr")
     if header_row is None:
         return None, "No rows in table."
-    # prefer <th>, fallback to first tr's <td>
-    ths = header_row.find_all("th")
-    if ths:
-        header_cells = [th.get_text(strip=True) for th in ths]
-        data_start = 1
-    else:
-        tds = header_row.find_all("td")
-        if tds:
-            header_cells = [td.get_text(strip=True) for td in tds]
-            data_start = 1
-        else:
-            return None, "Header row found but no cells."
-    # map headers
+    ths = header_row.find_all(["th","td"])  # first row may use td
+    header_cells = [th.get_text(strip=True) for th in ths]
     canonical = [ABBR_MAP.get(h, h) for h in header_cells]
-    # parse data rows (tr after header)
+
     rows = []
-    for tr in table.find_all("tr")[data_start:]:
+    for tr in table.find_all("tr")[1:]:
         cols = [td.get_text(strip=True) for td in tr.find_all(["td","th"])]
-        # skip empty rows
         if not cols or all(not c for c in cols):
             continue
-        # align length
         if len(cols) < len(canonical):
             cols += [""]*(len(canonical)-len(cols))
         cols = cols[:len(canonical)]
         row = {col_name: val for col_name,val in zip(canonical, cols) if col_name}
-        # require a Name
         name = (row.get("Name") or "").strip()
         if not name or name.lower() == "name":
             continue
         rows.append(row)
+
     if not rows:
         return None, "No data rows parsed from HTML table."
+
     df = pd.DataFrame(rows)
-    # coerce numeric-like columns
+
+    # coerce numeric columns where appropriate
     for c in df.columns:
-        if c in ("Name","Position","Transfer Value"):
+        if c in ("Name","Position","Transfer Value","Inf"):
             continue
-        df[c] = df[c].astype(str).str.extract(r'(-?\d+(\.\d+)?)')[0].astype(float)
+        # extract first numeric token
+        df[c] = df[c].astype(str).str.extract(r'(-?\d+(?:\.\d+)?)')[0]
+        df[c] = pd.to_numeric(df[c], errors='coerce')
+
+    # Age convert if exists
+    if "Age" in df.columns:
+        df["Age"] = pd.to_numeric(df["Age"], errors='coerce').astype('Int64')
+
     return df, None
 
-# -------------------------
-# RTF fallback parser (robust pipe '|' alignment)
-# -------------------------
-def parse_players_from_rtf_text(text):
-    lines = [ln for ln in text.splitlines() if ln.strip()]
-    header = None
-    for ln in lines[:400]:
-        if '|' in ln and 'Name' in ln and any(tok in ln for tok in ("Fin","Dri","Pas","Pac","Acc","Hea","Tck")):
-            header = ln
-            break
-    if header is None:
-        for ln in lines[:400]:
-            if '|' in ln and 'Name' in ln:
-                header = ln
-                break
-    if header is None:
-        return None, "Could not find header/attribute line automatically."
-    hdr_parts = [p.strip() for p in header.split('|')]
-    canonical = [ABBR_MAP.get(h, h) if h else "" for h in hdr_parts]
-    start_idx = lines.index(header)
-    rows = []
-    for ln in lines[start_idx+1: start_idx+5000]:
-        if '|' not in ln:
-            continue
-        parts = [p.strip() for p in ln.split('|')]
-        if all((not p) or set(p) <= set('- _.') for p in parts):
-            continue
-        if len(parts) != len(hdr_parts):
-            # tolerant attempt: if a line wraps (fewer parts), try merging with next line(s)
-            # find block of consecutive '|' lines until counts match header length
-            # build chunk starting at current line
-            chunk = parts.copy()
-            j = lines.index(ln) + 1
-            while len(chunk) < len(hdr_parts) and j < start_idx+5000:
-                nxt = lines[j]
-                if '|' in nxt:
-                    more = [p.strip() for p in nxt.split('|')]
-                    chunk += more
-                j += 1
-            if len(chunk) != len(hdr_parts):
-                continue
-            parts = chunk[:len(hdr_parts)]
-        row = {}
-        for col_name, val in zip(canonical, parts):
-            if col_name == "":
-                continue
-            row[col_name] = val
-        name = row.get("Name","").strip()
-        if not name or name.lower() == "name":
-            continue
-        rows.append(row)
-    if not rows:
-        return None, "Found header but no data rows detected (alignment mismatch)."
-    df = pd.DataFrame(rows)
-    for c in df.columns:
-        if c in ("Name","Position","Transfer Value"):
-            continue
-        df[c] = df[c].astype(str).str.extract(r'(-?\d+(\.\d+)?)')[0].astype(float)
-    return df, None
 
-# -------------------------
-# Main UI / file handling
-# -------------------------
-uploaded = st.file_uploader("Upload your `.html` or `.rtf` file", type=["html","htm","rtf"])
-
+uploaded = st.file_uploader("Upload your players HTML file", type=["html","htm"]) 
 if not uploaded:
-    st.info("Upload an HTML or RTF file. HTML works best (table parsing is robust).")
+    st.info("Upload an HTML file (export from FM as 'export to clipboard' -> save as .html). This app only accepts HTML tables.")
     st.stop()
 
-filename = uploaded.name.lower()
 raw = uploaded.read()
+try:
+    html_text = raw.decode('utf-8', errors='ignore')
+except Exception:
+    html_text = raw.decode('latin-1', errors='ignore')
 
-df = None
-err = None
-
-if filename.endswith(('.html','.htm')):
-    # parse HTML
-    try:
-        html_text = raw.decode('utf-8', errors='ignore')
-    except:
-        html_text = raw.decode('latin-1', errors='ignore')
-    df, err = parse_players_from_html(html_text)
-else:
-    # RTF: convert and parse
-    try:
-        # try decode then rtf->text
-        try:
-            text = rtf_to_text(raw.decode('utf-8', errors='ignore'))
-        except Exception:
-            text = rtf_to_text(raw)
-    except Exception as e:
-        err = f"Failed to convert RTF to text: {e}"
-    if text and err is None:
-        df, err = parse_players_from_rtf_text(text)
-
-st.subheader("Extracted preview / parse status")
+df, err = parse_players_from_html(html_text)
 if df is None:
-    st.error("Automatic parsing failed: " + str(err))
-    st.info("If parsing fails try exporting as HTML (recommended) or paste the problematic file here and I'll adapt the parser.")
-    st.code((raw.decode('utf-8', errors='ignore')[:1500] if isinstance(raw, (bytes, bytearray)) else str(raw)[:1500]))
+    st.error(f"Parsing failed: {err}")
     st.stop()
 
-st.success(f"Detected {len(df)} players and {len([c for c in df.columns if c!='Name'])} columns/attributes.")
-st.dataframe(df.head(10))
+st.success(f"Parsed {len(df)} players.")
 
 ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-if not ROLE_OPTIONS:
-    st.error("No roles present in WEIGHTS_BY_ROLE. Please ensure the full weight dict is included.")
-    st.stop()
-
-role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("SC") if "SC" in ROLE_OPTIONS else 0)
+role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
 
 selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
 
+# choose attributes that are both in canonical list and in parsed columns
+available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
 if not available_attrs:
-    st.error("No matching attributes found in parsed file. Columns detected: " + ", ".join(list(df.columns)[:60]))
+    st.error("No matching attribute columns found in the uploaded table. Detected columns: " + ", ".join(list(df.columns)))
     st.stop()
+
+normalize = st.checkbox("Normalize attribute values (divide by max)", value=True)
+max_val = 20.0
+if normalize:
+    max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
+
+attrs_df = df[available_attrs].fillna(0).astype(float)
+if normalize:
+    attrs_norm = attrs_df / float(max_val)
+else:
+    attrs_norm = attrs_df
 
 weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
 
-st.subheader("Weights used for ranking")
-st.dataframe(weights.rename("Weight").to_frame())
+scores = attrs_norm.values.dot(weights.values.astype(float))
 
-normalize = st.checkbox("Normalize attribute values (divide by max)", value=True)
-if normalize:
-    max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
-    attrs_df = df[available_attrs].fillna(0).astype(float) / float(max_val)
-else:
-    attrs_df = df[available_attrs].fillna(0).astype(float)
-
-scores = attrs_df.values.dot(weights.values.astype(float))
 df_out = df.copy()
 df_out["Score"] = scores
+
 df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
 
-st.subheader(f"Top players for role: {role}")
-cols_to_show = ["Name","Position","Score"] + available_attrs
-st.dataframe(df_out_sorted[cols_to_show].head(200))
+cols_to_show = [c for c in ["Name","Position","Age","Transfer Value","Score"] if c in df_out_sorted.columns]
+# show top 200 by score
+st.subheader(f"Top players for role: {role} (sorted by Score)")
+st.dataframe(df_out_sorted[cols_to_show + [c for c in available_attrs if c in df_out_sorted.columns]].head(200))
 
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
+st.markdown("---")
+with st.expander("About normalization"):
+    st.write("Normalization divides attribute values by an assumed maximum (e.g. 20). This turns raw attribute scores into a 0..1 range so weights act proportionally across attributes. You can change the assumed max if your data uses a different scale (e.g. 10 or 100). Changing it rescales the influence of attributes relative to their weights.")
