@@ -347,6 +347,8 @@ for i_idx in range(n_players):
     best_score = -1e9
     best_role = None
     for rk, vec in all_role_vectors.items():
+        if rk == "ST":
+            continue  # <-- skip ST
         sc = float(np.dot(player_attr_vals, vec))
         if sc > best_score:
             best_score = sc
@@ -511,6 +513,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
