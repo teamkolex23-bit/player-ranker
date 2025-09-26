@@ -173,7 +173,9 @@ def parse_players_from_html(html_text: str):
     if not rows:
         return None, "No data rows parsed from HTML table."
 
-    df = pd.DataFrame(rows)
+    df = pd.concat(dfs, ignore_index=True)
+
+    df = df.drop_duplicates(subset=["Name", "Position"], ignore_index=True)
 
     # convert numeric-like columns except textual ones
     for c in df.columns:
@@ -545,6 +547,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
