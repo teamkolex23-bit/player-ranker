@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
+import unicodedata
 
 st.set_page_config(layout="wide", page_title="FM24 Player Ranker")
 st.title("FM24 Player Ranker")
@@ -617,4 +618,5 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
