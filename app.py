@@ -333,6 +333,55 @@ df_out["_NameKey"] = df_out["Name"].apply(_normalize_name_for_key)
 # randomize order so ties aren't always broken strictly by input order (keeps behavior similar to before)
 df_out = df_out.sample(frac=1, random_state=None).reset_index(drop=True)
 
+def parse_transfer_value(x):
+    """
+    Robustly parse strings like "€1.2M", "1,200k", "£500k", "-" or numeric values into a float (euros).
+    Returns 0.0 for missing/invalid values.
+    """
+    try:
+        if pd.isna(x):
+            return 0.0
+        s = str(x).strip()
+        if not s or s == "-" or s.lower() in {"n/a", "none"}:
+            return 0.0
+
+        # Remove currency symbols and letters except digits, dots, commas and k/m suffixes
+        s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
+        if s2 == "":
+            # fallback: try to find any plain number inside the original string
+            m = re.search(r'(-?\d+(?:\.\d+)?)', s)
+            if m:
+                try:
+                    return float(m.group(1).replace(',', ''))
+                except Exception:
+                    return 0.0
+            return 0.0
+
+        # Match number and optional k/m suffix
+        m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
+        if not m:
+            # try to parse cleaned numeric string
+            try:
+                return float(s2.replace(',', ''))
+            except Exception:
+                return 0.0
+
+        num = m.group(1).replace(',', '')
+        try:
+            val = float(num)
+        except Exception:
+            val = 0.0
+
+        suf = m.group(2).lower()
+        if suf == 'k':
+            val *= 1_000.0
+        elif suf == 'm':
+            val *= 1_000_000.0
+
+        return val
+    except Exception:
+        return 0.0
+
 # compute numeric transfer value (use your parse_transfer_value function)
 df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_transfer_value)
 
@@ -618,5 +667,6 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
