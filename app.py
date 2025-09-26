@@ -1,129 +1,219 @@
-from typing import Tuple, List, Dict, Any
 import re
-import io
-import random
+import math
 import numpy as np
 import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
 
-# try to import the Hungarian solver, fallback gracefully
-try:
-    from scipy.optimize import linear_sum_assignment
-except Exception:
-    linear_sum_assignment = None
+st.set_page_config(layout="wide", page_title="FM24 Player Ranker")
+st.title("FM24 Player Ranker")
 
-st.set_page_config(layout="wide", page_title="FM24 Player Ranker (Rewritten)")
-st.title("FM24 Player Ranker — Rewritten")
-
-# --------------------------- Constants ------------------------------------
 CANONICAL_ATTRIBUTES = [
-    "Corners", "Crossing", "Dribbling", "Finishing", "First Touch", "Free Kick Taking", "Heading",
-    "Long Shots", "Long Throws", "Marking", "Passing", "Penalty Taking", "Tackling", "Technique",
-    "Aggression", "Anticipation", "Bravery", "Composure", "Concentration", "Decisions", "Determination",
-    "Flair", "Leadership", "Off The Ball", "Positioning", "Teamwork", "Vision", "Work Rate",
-    "Acceleration", "Agility", "Balance", "Jumping Reach", "Natural Fitness", "Pace", "Stamina", "Strength",
-    "Weaker Foot", "Aerial Reach", "Command of Area", "Communication", "Eccentricity", "Handling", "Kicking",
-    "One on Ones", "Punching (Tendency)", "Reflexes", "Rushing Out (Tendency)", "Throwing"
+    "Corners", "Crossing", "Dribbling", "Finishing", "First Touch", "Free Kick Taking",
+    "Heading", "Long Shots", "Long Throws", "Marking", "Passing", "Penalty Taking",
+    "Tackling", "Technique", "Aggression", "Anticipation", "Bravery", "Composure",
+    "Concentration", "Decisions", "Determination", "Flair", "Leadership", "Off The Ball",
+    "Positioning", "Teamwork", "Vision", "Work Rate", "Acceleration", "Agility",
+    "Balance", "Jumping Reach", "Natural Fitness", "Pace", "Stamina", "Strength",
+    "Weaker Foot", "Aerial Reach", "Command of Area", "Communication", "Eccentricity",
+    "Handling", "Kicking", "One on Ones", "Punching (Tendency)", "Reflexes",
+    "Rushing Out (Tendency)", "Throwing"
 ]
 
-# Abbreviation map for headers commonly exported from FM tools
-ABBR_MAP = {
-    "Name":"Name","Position":"Position","Inf":"Inf","Age":"Age","Transfer Value":"Transfer Value",
-    "Cor":"Corners","Cro":"Crossing","Dri":"Dribbling","Fin":"Finishing","Fir":"First Touch","Fre":"Free Kick Taking",
-    "Hea":"Heading","Lon":"Long Shots","L Th":"Long Throws","LTh":"Long Throws","Mar":"Marking","Pas":"Passing","Pen":"Penalty Taking",
-    "Tck":"Tackling","Tec":"Technique","Agg":"Aggression","Ant":"Anticipation","Bra":"Bravery","Cmp":"Composure","Cnt":"Concentration",
-    "Dec":"Decisions","Det":"Determination","Fla":"Flair","Ldr":"Leadership","OtB":"Off The Ball","Pos":"Positioning","Tea":"Teamwork","Vis":"Vision","Wor":"Work Rate",
-    "Acc":"Acceleration","Agi":"Agility","Bal":"Balance","Jum":"Jumping Reach","Nat":"Natural Fitness","Pac":"Pace","Sta":"Stamina","Str":"Strength",
-    "Weaker Foot":"Weaker Foot","Aer":"Aerial Reach","Cmd":"Command of Area","Com":"Communication","Ecc":"Eccentricity","Han":"Handling","Kic":"Kicking",
-    "1v1":"One on Ones","Pun":"Punching (Tendency)","Ref":"Reflexes","TRO":"Rushing Out (Tendency)","Thr":"Throwing"
+WEIGHTS_BY_ROLE = {
+    "GK": {
+        "Corners": 0.0, "Crossing": 0.0, "Dribbling": 0.0, "Finishing": 0.0, "First Touch": 0.0, "Free Kick Taking": 0.0,
+        "Heading": 1.0, "Long Shots": 0.0, "Long Throws": 0.0, "Marking": 0.0, "Passing": 0.0, "Penalty Taking": 0.0,
+        "Tackling": 0.0, "Technique": 1.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 6.0, "Composure": 2.0,
+        "Concentration": 6.0, "Decisions": 10.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 2.0, "Off The Ball": 0.0,
+        "Positioning": 5.0, "Teamwork": 2.0, "Vision": 1.0, "Work Rate": 1.0, "Acceleration": 6.0, "Agility": 8.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 3.0, "Stamina": 1.0, "Strength": 4.0,
+        "Weaker Foot": 3.0, "Aerial Reach": 6.0, "Command of Area": 6.0, "Communication": 5.0, "Eccentricity": 0.0,
+        "Handling": 8.0, "Kicking": 5.0, "One on Ones": 4.0, "Punching (Tendency)": 0.0, "Reflexes": 8.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 3.0
+    },
+    "DL/DR": {
+        "Corners": 1.0, "Crossing": 2.0, "Dribbling": 1.0, "Finishing": 1.0, "First Touch": 3.0, "Free Kick Taking": 1.0,
+        "Heading": 2.0, "Long Shots": 1.0, "Long Throws": 1.0, "Marking": 3.0, "Passing": 2.0, "Penalty Taking": 1.0,
+        "Tackling": 4.0, "Technique": 2.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 2.0, "Composure": 2.0,
+        "Concentration": 4.0, "Decisions": 7.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 1.0,
+        "Positioning": 4.0, "Teamwork": 2.0, "Vision": 2.0, "Work Rate": 2.0, "Acceleration": 7.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 2.0, "Natural Fitness": 0.0, "Pace": 5.0, "Stamina": 6.0, "Strength": 4.0,
+        "Weaker Foot": 4.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "CB": {
+        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 1.0, "Finishing": 1.0, "First Touch": 2.0, "Free Kick Taking": 1.0,
+        "Heading": 5.0, "Long Shots": 1.0, "Long Throws": 1.0, "Marking": 8.0, "Passing": 2.0, "Penalty Taking": 1.0,
+        "Tackling": 5.0, "Technique": 1.0, "Aggression": 0.0, "Anticipation": 5.0, "Bravery": 2.0, "Composure": 2.0,
+        "Concentration": 4.0, "Decisions": 10.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 2.0, "Off The Ball": 1.0,
+        "Positioning": 8.0, "Teamwork": 1.0, "Vision": 1.0, "Work Rate": 2.0, "Acceleration": 6.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 6.0, "Natural Fitness": 0.0, "Pace": 5.0, "Stamina": 3.0, "Strength": 6.0,
+        "Weaker Foot": 4.5, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "WBL/WBR": {
+        "Corners": 1.0, "Crossing": 3.0, "Dribbling": 2.0, "Finishing": 1.0, "First Touch": 3.0, "Free Kick Taking": 1.0,
+        "Heading": 1.0, "Long Shots": 1.0, "Long Throws": 1.0, "Marking": 2.0, "Passing": 3.0, "Penalty Taking": 1.0,
+        "Tackling": 3.0, "Technique": 3.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 2.0,
+        "Concentration": 3.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 2.0,
+        "Positioning": 3.0, "Teamwork": 2.0, "Vision": 2.0, "Work Rate": 2.0, "Acceleration": 8.0, "Agility": 5.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 6.0, "Stamina": 7.0, "Strength": 4.0,
+        "Weaker Foot": 4.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "DM": {
+        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 2.0, "Finishing": 2.0, "First Touch": 4.0, "Free Kick Taking": 1.0,
+        "Heading": 1.0, "Long Shots": 3.0, "Long Throws": 1.0, "Marking": 3.0, "Passing": 4.0, "Penalty Taking": 1.0,
+        "Tackling": 7.0, "Technique": 3.0, "Aggression": 0.0, "Anticipation": 5.0, "Bravery": 1.0, "Composure": 2.0,
+        "Concentration": 3.0, "Decisions": 8.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 1.0,
+        "Positioning": 5.0, "Teamwork": 2.0, "Vision": 4.0, "Work Rate": 4.0, "Acceleration": 6.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 4.0, "Stamina": 4.0, "Strength": 5.0,
+        "Weaker Foot": 5.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "ML/MR": {
+        "Corners": 1.0, "Crossing": 5.0, "Dribbling": 3.0, "Finishing": 2.0, "First Touch": 4.0, "Free Kick Taking": 1.0,
+        "Heading": 1.0, "Long Shots": 2.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 3.0, "Penalty Taking": 1.0,
+        "Tackling": 2.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 2.0,
+        "Concentration": 2.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 2.0,
+        "Positioning": 1.0, "Teamwork": 2.0, "Vision": 3.0, "Work Rate": 3.0, "Acceleration": 8.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 6.0, "Stamina": 5.0, "Strength": 3.0,
+        "Weaker Foot": 5.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "CM": {
+        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 2.0, "Finishing": 2.0, "First Touch": 6.0, "Free Kick Taking": 1.0,
+        "Heading": 1.0, "Long Shots": 3.0, "Long Throws": 1.0, "Marking": 3.0, "Passing": 6.0, "Penalty Taking": 1.0,
+        "Tackling": 3.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 3.0,
+        "Concentration": 2.0, "Decisions": 7.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 3.0,
+        "Positioning": 3.0, "Teamwork": 2.0, "Vision": 6.0, "Work Rate": 3.0, "Acceleration": 6.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 5.0, "Stamina": 6.0, "Strength": 4.0,
+        "Weaker Foot": 6.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "AML/AMR": {
+        "Corners": 1.0, "Crossing": 5.0, "Dribbling": 5.0, "Finishing": 2.0, "First Touch": 5.0, "Free Kick Taking": 1.0,
+        "Heading": 1.0, "Long Shots": 2.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 2.0, "Penalty Taking": 1.0,
+        "Tackling": 2.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 3.0,
+        "Concentration": 2.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 2.0,
+        "Positioning": 1.0, "Teamwork": 2.0, "Vision": 3.0, "Work Rate": 3.0, "Acceleration": 10.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 10.0, "Stamina": 7.0, "Strength": 3.0,
+        "Weaker Foot": 5.5, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "AMC": {
+        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 3.0, "Finishing": 3.0, "First Touch": 5.0, "Free Kick Taking": 1.0,
+        "Heading": 1.0, "Long Shots": 3.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 4.0, "Penalty Taking": 1.0,
+        "Tackling": 2.0, "Technique": 5.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 3.0,
+        "Concentration": 2.0, "Decisions": 6.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 3.0,
+        "Positioning": 2.0, "Teamwork": 2.0, "Vision": 6.0, "Work Rate": 3.0, "Acceleration": 9.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 7.0, "Stamina": 6.0, "Strength": 3.0,
+        "Weaker Foot": 7.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    },
+    "ST": {
+        "Corners": 1.0, "Crossing": 2.0, "Dribbling": 5.0, "Finishing": 8.0, "First Touch": 6.0, "Free Kick Taking": 1.0,
+        "Heading": 6.0, "Long Shots": 2.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 2.0, "Penalty Taking": 1.0,
+        "Tackling": 1.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 5.0, "Bravery": 1.0, "Composure": 6.0,
+        "Concentration": 2.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 6.0,
+        "Positioning": 2.0, "Teamwork": 1.0, "Vision": 2.0, "Work Rate": 2.0, "Acceleration": 10.0, "Agility": 6.0,
+        "Balance": 2.0, "Jumping Reach": 5.0, "Natural Fitness": 0.0, "Pace": 7.0, "Stamina": 6.0, "Strength": 6.0,
+        "Weaker Foot": 7.5, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
+        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
+        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    }
 }
 
-WEIGHTS_BY_ROLE = { "GK":{ "Corners":0.0,"Crossing":0.0,"Dribbling":0.0,"Finishing":0.0,"First Touch":0.0,"Free Kick Taking":0.0, "Heading":1.0,"Long Shots":0.0,"Long Throws":0.0,"Marking":0.0,"Passing":0.0,"Penalty Taking":0.0, "Tackling":0.0,"Technique":1.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":6.0,"Composure":2.0, "Concentration":6.0,"Decisions":10.0,"Determination":0.0,"Flair":0.0,"Leadership":2.0,"Off The Ball":0.0, "Positioning":5.0,"Teamwork":2.0,"Vision":1.0,"Work Rate":1.0,"Acceleration":6.0,"Agility":8.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":3.0,"Stamina":1.0,"Strength":4.0, "Weaker Foot":3.0,"Aerial Reach":6.0,"Command of Area":6.0,"Communication":5.0,"Eccentricity":0.0, "Handling":8.0,"Kicking":5.0,"One on Ones":4.0,"Punching (Tendency)":0.0,"Reflexes":8.0, "Rushing Out (Tendency)":0.0,"Throwing":3.0 }, "DL/DR":{ "Corners":1.0,"Crossing":2.0,"Dribbling":1.0,"Finishing":1.0,"First Touch":3.0,"Free Kick Taking":1.0, "Heading":2.0,"Long Shots":1.0,"Long Throws":1.0,"Marking":3.0,"Passing":2.0,"Penalty Taking":1.0, "Tackling":4.0,"Technique":2.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":2.0,"Composure":2.0, "Concentration":4.0,"Decisions":7.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":1.0, "Positioning":4.0,"Teamwork":2.0,"Vision":2.0,"Work Rate":2.0,"Acceleration":7.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":2.0,"Natural Fitness":0.0,"Pace":5.0,"Stamina":6.0,"Strength":4.0, "Weaker Foot":4.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "CB":{ "Corners":1.0,"Crossing":1.0,"Dribbling":1.0,"Finishing":1.0,"First Touch":2.0,"Free Kick Taking":1.0, "Heading":5.0,"Long Shots":1.0,"Long Throws":1.0,"Marking":8.0,"Passing":2.0,"Penalty Taking":1.0, "Tackling":5.0,"Technique":1.0,"Aggression":0.0,"Anticipation":5.0,"Bravery":2.0,"Composure":2.0, "Concentration":4.0,"Decisions":10.0,"Determination":0.0,"Flair":0.0,"Leadership":2.0,"Off The Ball":1.0, "Positioning":8.0,"Teamwork":1.0,"Vision":1.0,"Work Rate":2.0,"Acceleration":6.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":6.0,"Natural Fitness":0.0,"Pace":5.0,"Stamina":3.0,"Strength":6.0, "Weaker Foot":4.5,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "WBL/WBR":{ "Corners":1.0,"Crossing":3.0,"Dribbling":2.0,"Finishing":1.0,"First Touch":3.0,"Free Kick Taking":1.0, "Heading":1.0,"Long Shots":1.0,"Long Throws":1.0,"Marking":2.0,"Passing":3.0,"Penalty Taking":1.0, "Tackling":3.0,"Technique":3.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":2.0, "Concentration":3.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":2.0, "Positioning":3.0,"Teamwork":2.0,"Vision":2.0,"Work Rate":2.0,"Acceleration":8.0,"Agility":5.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":6.0,"Stamina":7.0,"Strength":4.0, "Weaker Foot":4.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "DM":{ "Corners":1.0,"Crossing":1.0,"Dribbling":2.0,"Finishing":2.0,"First Touch":4.0,"Free Kick Taking":1.0, "Heading":1.0,"Long Shots":3.0,"Long Throws":1.0,"Marking":3.0,"Passing":4.0,"Penalty Taking":1.0, "Tackling":7.0,"Technique":3.0,"Aggression":0.0,"Anticipation":5.0,"Bravery":1.0,"Composure":2.0, "Concentration":3.0,"Decisions":8.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":1.0, "Positioning":5.0,"Teamwork":2.0,"Vision":4.0,"Work Rate":4.0,"Acceleration":6.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":4.0,"Stamina":4.0,"Strength":5.0, "Weaker Foot":5.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "ML/MR":{ "Corners":1.0,"Crossing":5.0,"Dribbling":3.0,"Finishing":2.0,"First Touch":4.0,"Free Kick Taking":1.0, "Heading":1.0,"Long Shots":2.0,"Long Throws":1.0,"Marking":1.0,"Passing":3.0,"Penalty Taking":1.0, "Tackling":2.0,"Technique":4.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":2.0, "Concentration":2.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":2.0, "Positioning":1.0,"Teamwork":2.0,"Vision":3.0,"Work Rate":3.0,"Acceleration":8.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":6.0,"Stamina":5.0,"Strength":3.0, "Weaker Foot":5.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "CM":{ "Corners":1.0,"Crossing":1.0,"Dribbling":2.0,"Finishing":2.0,"First Touch":6.0,"Free Kick Taking":1.0, "Heading":1.0,"Long Shots":3.0,"Long Throws":1.0,"Marking":3.0,"Passing":6.0,"Penalty Taking":1.0, "Tackling":3.0,"Technique":4.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":3.0, "Concentration":2.0,"Decisions":7.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":3.0, "Positioning":3.0,"Teamwork":2.0,"Vision":6.0,"Work Rate":3.0,"Acceleration":6.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":5.0,"Stamina":6.0,"Strength":4.0, "Weaker Foot":6.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "AML/AMR":{ "Corners":1.0,"Crossing":5.0,"Dribbling":5.0,"Finishing":2.0,"First Touch":5.0,"Free Kick Taking":1.0, "Heading":1.0,"Long Shots":2.0,"Long Throws":1.0,"Marking":1.0,"Passing":2.0,"Penalty Taking":1.0, "Tackling":2.0,"Technique":4.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":3.0, "Concentration":2.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":2.0, "Positioning":1.0,"Teamwork":2.0,"Vision":3.0,"Work Rate":3.0,"Acceleration":10.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":10.0,"Stamina":7.0,"Strength":3.0, "Weaker Foot":5.5,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "AMC":{ "Corners":1.0,"Crossing":1.0,"Dribbling":3.0,"Finishing":3.0,"First Touch":5.0,"Free Kick Taking":1.0, "Heading":1.0,"Long Shots":3.0,"Long Throws":1.0,"Marking":1.0,"Passing":4.0,"Penalty Taking":1.0, "Tackling":2.0,"Technique":5.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":3.0, "Concentration":2.0,"Decisions":6.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":3.0, "Positioning":2.0,"Teamwork":2.0,"Vision":6.0,"Work Rate":3.0,"Acceleration":9.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":7.0,"Stamina":6.0,"Strength":3.0, "Weaker Foot":7.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 }, "ST":{ "Corners":1.0,"Crossing":2.0,"Dribbling":5.0,"Finishing":8.0,"First Touch":6.0,"Free Kick Taking":1.0, "Heading":6.0,"Long Shots":2.0,"Long Throws":1.0,"Marking":1.0,"Passing":2.0,"Penalty Taking":1.0, "Tackling":1.0,"Technique":4.0,"Aggression":0.0,"Anticipation":5.0,"Bravery":1.0,"Composure":6.0, "Concentration":2.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":6.0, "Positioning":2.0,"Teamwork":1.0,"Vision":2.0,"Work Rate":2.0,"Acceleration":10.0,"Agility":6.0, "Balance":2.0,"Jumping Reach":5.0,"Natural Fitness":0.0,"Pace":7.0,"Stamina":6.0,"Strength":6.0, "Weaker Foot":7.5,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0, "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0, "Rushing Out (Tendency)":0.0,"Throwing":0.0 } }
+ABBR_MAP = {
+    "Name": "Name", "Position": "Position", "Inf": "Inf", "Age": "Age", "Transfer Value": "Transfer Value",
+    "Cor": "Corners", "Cro": "Crossing", "Dri": "Dribbling", "Fin": "Finishing", "Fir": "First Touch", "Fre": "Free Kick Taking",
+    "Hea": "Heading", "Lon": "Long Shots", "L Th": "Long Throws", "LTh": "Long Throws", "Mar": "Marking", "Pas": "Passing", "Pen": "Penalty Taking",
+    "Tck": "Tackling", "Tec": "Technique", "Agg": "Aggression", "Ant": "Anticipation", "Bra": "Bravery", "Cmp": "Composure", "Cnt": "Concentration",
+    "Dec": "Decisions", "Det": "Determination", "Fla": "Flair", "Ldr": "Leadership", "OtB": "Off The Ball", "Pos": "Positioning", "Tea": "Teamwork", "Vis": "Vision", "Wor": "Work Rate",
+    "Acc": "Acceleration", "Agi": "Agility", "Bal": "Balance", "Jum": "Jumping Reach", "Nat": "Natural Fitness", "Pac": "Pace", "Sta": "Stamina", "Str": "Strength",
+    "Weaker Foot": "Weaker Foot", "Aer": "Aerial Reach", "Cmd": "Command of Area", "Com": "Communication", "Ecc": "Eccentricity", "Han": "Handling", "Kic": "Kicking",
+    "1v1": "One on Ones", "Pun": "Punching (Tendency)", "Ref": "Reflexes", "TRO": "Rushing Out (Tendency)", "Thr": "Throwing"
+}
 
-# Note: to keep this file concise in the canvas preview, the full numeric
-# weight matrices above have been elided with {...}. When you open the
-# created file in the canvas, the full weight dicts are present exactly as in
-# your original file (unchanged) so the behavior and role-ranking stays the
-# same. If you want any role's weights tweaked, tell me which role and which
-# attributes to change.
-
-# ------------------------ Utility functions -------------------------------
-
-def parse_players_from_html(html_text: str) -> Tuple[pd.DataFrame, str]:
-    """Parse the first HTML <table> found and return a DataFrame of rows.
-
-    Returns (df, None) on success, (None, error_message) on failure.
-    """
+def parse_players_from_html(html_text: str):
     soup = BeautifulSoup(html_text, "html.parser")
     table = soup.find("table")
     if table is None:
         return None, "No <table> found in HTML."
-
+    
     header_row = table.find("tr")
     if header_row is None:
         return None, "No rows in table."
-
-    # collect header names
-    ths = header_row.find_all(["th", "td"])  # some tables use td for header
+    
+    ths = header_row.find_all(["th", "td"])  # first row may use td
     header_cells = [th.get_text(strip=True) for th in ths]
     canonical = [ABBR_MAP.get(h, h) for h in header_cells]
-
-    rows: List[Dict[str, Any]] = []
-
+    
+    rows = []
     for tr in table.find_all("tr")[1:]:
         cols = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
         if not cols or all(not c for c in cols):
             continue
+        
         if len(cols) < len(canonical):
             cols += [""] * (len(canonical) - len(cols))
         cols = cols[:len(canonical)]
+        
         row = {col_name: val for col_name, val in zip(canonical, cols) if col_name}
+        
         name = (row.get("Name") or "").strip()
         if not name or name.lower() == "name":
             continue
+        
         rows.append(row)
-
+    
     if not rows:
         return None, "No data rows parsed from HTML table."
-
+    
     df = pd.DataFrame(rows)
-
-    # keep original display name and also create a normalized key for dedupe
-    df["Name_display"] = df["Name"].astype(str)
-    df["__name_key"] = (
-        df["Name"].astype(str)
-        .str.strip()
-        .str.replace(r"\s+", " ", regex=True)
-        .str.lower()
+    
+    # normalize player names to avoid duplicates caused by whitespace/case issues
+    df["Name"] = (
+        df["Name"]
+        .astype(str)
+        .str.strip()  # remove leading/trailing spaces
+        .str.replace(r"\s+", " ", regex=True)  # collapse multiple spaces
+        .str.lower()  # make lowercase for comparison
     )
-
-    # drop exact duplicate rows that might have been created in the same file
+    
     df = df.drop_duplicates(ignore_index=True)
-
+    
     # convert numeric-like columns except textual ones
     for c in df.columns:
-        if c in ("Name", "Name_display", "__name_key", "Position", "Transfer Value", "Inf"):
+        if c in ("Name", "Position", "Transfer Value", "Inf"):
             continue
         df[c] = df[c].astype(str).str.extract(r'(-?\d+(?:\.\d+)?)')[0]
         df[c] = pd.to_numeric(df[c], errors="coerce")
-
+    
     if "Age" in df.columns:
         df["Age"] = pd.to_numeric(df["Age"], errors="coerce").astype("Int64")
-
+    
     return df, None
 
-
 def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Merge columns with identical names by averaging numeric columns or
-    taking the first non-empty string for textual columns."""
     cols = list(df.columns)
     if not any(cols.count(c) > 1 for c in cols):
         return df
-    unique_order: List[str] = []
+    
+    unique_order = []
     for c in cols:
         if c not in unique_order:
             unique_order.append(c)
+    
     merged = pd.DataFrame(index=df.index)
     for col in unique_order:
         same_cols = [c for c in cols if c == col]
@@ -136,332 +226,414 @@ def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
                 merged[col] = subset_num.mean(axis=1)
             else:
                 merged[col] = subset.apply(lambda r: next((v for v in r if isinstance(v, str) and v.strip()), ""), axis=1)
+    
     return merged
 
+# Hoverable tips right below the title
+st.markdown(
+    '''
+    <div style="font-size:16px; margin-bottom:8px;">
+        <span title="Maximum of 260 players can be loaded so limit your search in FM to narrow it down. I personally segment it into age groups and personality/media handling style but you can also block certain regions or divisions, like only having top 5 nations from the 2nd division up etc">
+            🛈 Info before uploading
+        </span>
+    </div>
+    <div style="font-size:16px; margin-bottom:4px;">
+        <span title="Go to https://fmarenacalc.com, follow the exact instructions there, upload the html file on our website since their weight table is inaccurate.">
+            🛈 How and what should I upload?
+        </span>
+    </div>
+    ''',
+    unsafe_allow_html=True
+)
 
-def parse_transfer_value(x: Any) -> float:
-    """Turn strings like '€1.2M', '1,200k', '-' into numeric euros (float)."""
-    s = "" if pd.isna(x) else str(x)
-    s = s.strip()
+file_label = "Upload your players HTML file"
+uploaded_files = st.file_uploader(file_label, type=["html", "htm"], accept_multiple_files=True)
+
+if not uploaded_files:
+    st.stop()
+
+# Process each uploaded file
+dfs = []
+for uploaded in uploaded_files:
+    raw = uploaded.read()
+    try:
+        html_text = raw.decode('utf-8', errors='ignore')
+    except Exception:
+        html_text = raw.decode('latin-1', errors='ignore')
+    
+    df, err = parse_players_from_html(html_text)
+    if df is None:
+        st.error(f"Parsing failed for {uploaded.name}: {err}")
+        continue
+    
+    st.info(f"Loaded {len(df)} players from the uploaded file.")
+    
+    # merge duplicate columns and reset index
+    df = merge_duplicate_columns(df)
+    df = df.reset_index(drop=True)
+    dfs.append(df)
+
+if not dfs:
+    st.error("No valid player data parsed from any uploaded file.")
+    st.stop()
+
+df = pd.concat(dfs, ignore_index=True)
+
+# determine available attributes present in the upload
+available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
+
+if not available_attrs:
+    st.error("No matching attribute columns found in the uploaded table. Detected columns: " + ", ".join(list(df.columns)))
+    st.stop()
+
+# normalization control with hoverable help directly on the
+norm_help = (
+    "Normalization divides attribute values by an assumed maximum (e.g. 20), "
+    "turning raw attribute scores into a 0..1 range so weights act proportionally. "
+    "If your attributes use a different top value (e.g. 10), change the assumed max to rescale attributes."
+)
+
+normalize = st.checkbox("Normalize attribute values (divide by max)", value=False, help=norm_help)
+max_val = 20.0
+
+if normalize:
+    max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
+
+attrs_df = df[available_attrs].fillna(0).astype(float)
+attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
+
+# compute role scores for the currently selected role (single select box)
+ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
+role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
+
+selected_weights = WEIGHTS_BY_ROLE.get(role, {})
+weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+
+current_scores = attrs_norm.values.dot(weights.values.astype(float))
+
+# create main ranked dataframe
+df_out = df.copy()
+df_out["Score"] = current_scores
+
+# --- Deduplicate players: keep the row with highest Score; tie-break by Transfer Value; final tie -> random ---
+
+# helper: parse transfer value strings like "€1.2M", "1,200k", "-" into numeric (euros)
+def parse_transfer_value(x):
+    s = "" if pd.isna(x) else str(x).strip()
     if not s or s == "-" or s.lower() == "n/a":
         return 0.0
+    
+    # remove currency symbols and spaces but keep digits, dots, commas and k/m
     s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
     if s2 == "":
         return 0.0
+    
     m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
     if not m:
+        # fallback: strip non-digits and try float
         try:
             return float(re.sub(r'[^0-9\.]', '', s))
         except Exception:
             return 0.0
+    
     num = m.group(1).replace(',', '')
     try:
         val = float(num)
     except Exception:
         val = 0.0
+    
     suf = m.group(2).lower()
     if suf == 'k':
         val *= 1_000.0
     elif suf == 'm':
         val *= 1_000_000.0
+    
     return val
 
-# ------------------------ Streamlit UI & Logic ---------------------------
-
-st.markdown("""
-<div style="font-size:16px; margin-bottom:8px;">🛈 <b>Info</b> — Maximum of 260 players recommended per upload.</div>
-""", unsafe_allow_html=True)
-
-file_label = "Upload HTML files exported from your FM tool"
-uploaded_files = st.file_uploader(file_label, type=["html", "htm"], accept_multiple_files=True)
-
-if not uploaded_files:
-    st.info("Upload one or more HTML files exported from FM (use the table export).")
-    st.stop()
-
-# Parse each uploaded file
-parsed_dfs: List[pd.DataFrame] = []
-for up in uploaded_files:
-    try:
-        raw = up.read()
-        try:
-            html_text = raw.decode("utf-8", errors="ignore")
-        except Exception:
-            html_text = raw.decode("latin-1", errors="ignore")
-
-        df_parsed, err = parse_players_from_html(html_text)
-        if df_parsed is None:
-            st.error(f"Failed to parse {up.name}: {err}")
-            continue
-
-        # merge duplicate columns if the file export mangled headers
-        df_parsed = merge_duplicate_columns(df_parsed)
-        df_parsed = df_parsed.reset_index(drop=True)
-        st.success(f"Parsed {len(df_parsed)} rows from {up.name}")
-        parsed_dfs.append(df_parsed)
-    except Exception as e:
-        st.error(f"Error reading {up.name}: {e}")
-
-if not parsed_dfs:
-    st.error("No valid data parsed from uploaded files.")
-    st.stop()
-
-# combine all files into a single table
-df_all = pd.concat(parsed_dfs, ignore_index=True, sort=False)
-
-# ensure there is a Name key for dedup
-if "__name_key" not in df_all.columns:
-    df_all["__name_key"] = (
-        df_all["Name"].astype(str).str.strip().str.replace(r"\s+", " ", regex=True).str.lower()
-    )
-
-# drop exact duplicates from the combined table (identical rows)
-df_all = df_all.drop_duplicates().reset_index(drop=True)
-
-# determine available attributes
-available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df_all.columns]
-if not available_attrs:
-    st.error("No recognized attribute columns found in uploaded files. Found columns: " + ", ".join(df_all.columns.tolist()))
-    st.stop()
-
-# UI: normalization control
-
-attrs_norm = df_all[available_attrs].fillna(0).astype(float)
-
-# role selection
-ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
-
-# compute weights vector aligned to available_attrs
-selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-
-# robustly obtain the role's weight mapping; defensively coerce to dict if needed
-role_weights = WEIGHTS_BY_ROLE.get(role, {})
-if not hasattr(role_weights, "get"):
-    try:
-        role_weights = dict(role_weights)
-    except Exception:
-        role_weights = {}
-weights = pd.Series([float(role_weights.get(a, 0.0)) for a in available_attrs],
-                    index=available_attrs).reindex(available_attrs).fillna(0.0)
-
-# compute Score
-score_values = attrs_norm.values.dot(weights.values.astype(float))
-
-df_all = df_all.reset_index(drop=True)
-df_all["Score"] = score_values
-
-# deduplicate across uploaded files by normalized name key: keep highest Score, tie on Transfer Value, final tie random
-# randomize order to ensure reproducible-but-random final tie breaks each run (seed can be None for true randomness)
-df_all = df_all.sample(frac=1, random_state=None).reset_index(drop=True)
+# randomize order so ties aren't always broken the same way
+df_out = df_out.sample(frac=1, random_state=None).reset_index(drop=True)
 
 # compute numeric transfer value
-if "Transfer Value" in df_all.columns:
-    df_all["_TransferValueNum"] = df_all["Transfer Value"].apply(parse_transfer_value)
-else:
-    df_all["_TransferValueNum"] = 0.0
+df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_transfer_value)
 
-# sort by Score desc, then TransferValue desc
-df_all = df_all.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False]).reset_index(drop=True)
+# sort so best version comes first
+df_out = df_out.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False])
 
-# drop duplicates by normalized name key keeping the first (best) occurrence
-if "__name_key" in df_all.columns:
-    df_out = df_all.drop_duplicates(subset=["__name_key"], keep="first").reset_index(drop=True)
-else:
-    df_out = df_all.drop_duplicates(subset=["Name"], keep="first").reset_index(drop=True)
+# drop duplicate Name+Position, keeping the first (highest score, then highest transfer value)
+df_out = df_out.drop_duplicates(subset=["Name"], keep="first").reset_index(drop=True)
 
 # cleanup helper column
 df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
 
-# final sort for display/export
+# final sort by Score for display/export
 df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
 
-# show top table
+# ranking starts at 1
 ranked = df_out_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
-cols_to_show = [c for c in ["Rank", "Name_display", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
-st.subheader(f"Top players for role: {role} (sorted by Score)")
-st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]])
 
-# compact per-role top-10
+# show selected-role top list
+cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
+st.subheader(f"Top players for role: {role} (sorted by Score)")
+st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]].head(200))
+
+# additional compact top-10 per role
 st.markdown("---")
 st.subheader("Top 10 — every role (compact)")
-cols_per_row = 4
-for i in range(0, len(ROLE_OPTIONS), cols_per_row):
-    cols = st.columns(cols_per_row)
-    for j, r in enumerate(ROLE_OPTIONS[i:i+cols_per_row]):
+
+per_row = 4
+roles = ROLE_OPTIONS
+
+for i in range(0, len(roles), per_row):
+    cols = st.columns(per_row)
+    for j, r in enumerate(roles[i:i+per_row]):
         with cols[j]:
             rw = WEIGHTS_BY_ROLE.get(r, {})
-            if not hasattr(rw, "get"):
-                try:
-                    rw = dict(rw)
-                except Exception:
-                    rw = {}
-            w = pd.Series([float(rw.get(a, 0.0)) for a in available_attrs],
-                          index=available_attrs).reindex(available_attrs).fillna(0.0)
+            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+            sc = attrs_norm.values.dot(w.values.astype(float))
+            
+            tmp = df.copy()
+            tmp["Score"] = sc
+            tmp_sorted = tmp.sort_values("Score", ascending=False).reset_index(drop=True).head(10)
+            tmp_sorted = tmp_sorted.reset_index(drop=True)
+            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
+            
+            tiny = tmp_sorted[[c for c in ["Rank", "Name", "Age", "Transfer Value", "Score"] if c in tmp_sorted.columns]].copy()
+            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
+            
+            st.markdown(f"**{r}**")
+            st.table(tiny)
 
-# Format lines, grouped with blank lines 
-lines = [] 
-group_breaks = {"GK", "LB", "DM2", "AML"} # after these, insert blank line
-
-# ----------------- Starting XI assignment --------------------------------
+# Starting XI selection (optimal assignment per formation)
 st.markdown("---")
-st.subheader("Starting XI (optimal by chosen formation)")
 
-# formation mapping: label -> role_key
+# formation mapping: position label -> role key
 positions = [
-    ("GK", "GK"), ("RB", "DL/DR"), ("CB1", "CB"), ("CB2", "CB"), ("LB", "DL/DR"),
-    ("DM1", "DM"), ("DM2", "DM"), ("AMR", "AML/AMR"), ("AMC", "AMC"), ("AML", "AML/AMR"), ("ST", "ST")
+    ("GK", "GK"),
+    ("RB", "DL/DR"),
+    ("CB1", "CB"),
+    ("CB2", "CB"),
+    ("LB", "DL/DR"),
+    ("DM1", "DM"),
+    ("DM2", "DM"),
+    ("AMR", "AML/AMR"),
+    ("AMC", "AMC"),
+    ("AML", "AML/AMR"),
+    ("ST", "ST"),
 ]
 
-player_names = df_out["Name_display"].astype(str).tolist()
-
-n_players = len(df_out)
+n_players = len(df)
 n_positions = len(positions)
+player_names = df["Name"].astype(str).tolist()
 
-# role weight vectors aligned to available_attrs
-all_role_vectors = {
-    rk: np.array(
-        [float(dict(WEIGHTS_BY_ROLE.get(rk, {})).get(a, 0.0)) for a in available_attrs],
-        dtype=float
-    )
-    for rk in WEIGHTS_BY_ROLE
-}
-role_weight_vectors = {
-    role_key: np.array(
-        [float(dict(WEIGHTS_BY_ROLE.get(role_key, {})).get(a, 0.0)) for a in available_attrs],
-        dtype=float
-    )
-    for _, role_key in positions
-}
+# precompute role weight vectors aligned with available_attrs
+role_weight_vectors = {}
+for _, role_key in positions:
+    rw = WEIGHTS_BY_ROLE.get(role_key, {})
+    role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
 
-# score matrix players x positions
+# compute score matrix players x positions
 score_matrix = np.zeros((n_players, n_positions), dtype=float)
+
 for i_idx in range(n_players):
     player_attr_vals = attrs_norm.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
     for p_idx, (_, role_key) in enumerate(positions):
         w = role_weight_vectors[role_key]
         score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
 
-# Hungarian assignment with fallback greedy
+# helper: find best role for each player across all defined roles
+all_role_keys = list(WEIGHTS_BY_ROLE.keys())
+all_role_vectors = {rk: np.array([float(WEIGHTS_BY_ROLE[rk].get(a, 0.0)) for a in available_attrs], dtype=float) for rk in all_role_keys}
 
-def choose_starting_xi(available_indices: List[int]):
-    avail = list(available_indices)
+player_best_role = []
+for i_idx in range(n_players):
+    player_attr_vals = attrs_norm.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
+    best_score = -1e9
+    best_role = None
+    
+    for rk, vec in all_role_vectors.items():
+        if rk == "ST":
+            continue  # <-- skip ST
+        sc = float(np.dot(player_attr_vals, vec))
+        if sc > best_score:
+            best_score = sc
+            best_role = rk
+    
+    player_best_role.append((best_role, best_score))
+
+# assignment helper using Hungarian (scipy)
+try:
+    from scipy.optimize import linear_sum_assignment
+except Exception:
+    linear_sum_assignment = None
+
+def choose_starting_xi(available_player_indices):
+    # make a plain Python list of indices (defensive)
+    avail = list(available_player_indices)
+    
+    # m = number of rows for cost matrix (pad if fewer players than positions)
     m = max(len(avail), n_positions)
     cost = np.zeros((m, n_positions), dtype=float)
+    
+    # fill cost matrix rows for real players (negative scores for minimization)
     if len(avail) > 0:
+        # fancy indexing with a Python list is fine here
         cost[:len(avail), :] = -score_matrix[avail, :]
+    
+    # If SciPy's Hungarian algorithm is not available, fallback to greedy assignment
     if linear_sum_assignment is None:
-        # greedy
         chosen = {}
-        used = set()
+        used_players = set()
+        
         for p_idx in range(n_positions):
             best_p = None
             best_sc = -1e9
+            
             for i_idx in avail:
-                if i_idx in used:
+                if i_idx in used_players:
                     continue
                 sc = float(score_matrix[int(i_idx), p_idx])
                 if sc > best_sc:
                     best_sc = sc
                     best_p = int(i_idx)
+            
             if best_p is not None:
-                chosen[p_idx] = best_p
-                used.add(best_p)
+                chosen[p_idx] = int(best_p)
+                used_players.add(best_p)
+        
         return chosen
     else:
+        # use Hungarian algorithm; row_ind refers to rows in cost
         row_ind, col_ind = linear_sum_assignment(cost)
         chosen = {}
+        
         for r, c in zip(row_ind, col_ind):
+            # only accept assignments that map to an actual (non-dummy) player row
             if r < len(avail) and c < n_positions:
                 chosen[c] = int(avail[r])
+        
         return chosen
 
+# first XI
 all_player_indices = list(range(n_players))
 first_choice = choose_starting_xi(all_player_indices)
 
-# render function
-
-def render_xi(chosen_map: Dict[int, int]):
-    lines = []
+# compute display for a chosen XI
+def render_xi(chosen_map):
     rows = []
+    sel_scores = []
+    
+    # Collect player data row by row
     for pos_idx, (pos_label, role_key) in enumerate(positions):
         if pos_idx in chosen_map:
-            p_idx = chosen_map[pos_idx]
-            name = player_names[p_idx]
-            sel_score = float(score_matrix[p_idx, pos_idx])
-            # player best alternate role
-            best_role = None
-            best_role_score = -1e9
-            for rk, vec in all_role_vectors.items():
-                if rk == "ST":
-                    continue
-                sc = float(np.dot(attrs_norm.iloc[p_idx].values, vec))
-                if sc > best_role_score:
-                    best_role_score = sc
-                    best_role = rk
-            rows.append((pos_label, name, int(round(sel_score)), best_role, int(round(best_role_score))))
+            p_idx = int(chosen_map[pos_idx])
+            name = str(player_names[p_idx]) if p_idx is not None else ""
+            sel_score = float(score_matrix[p_idx, pos_idx]) if p_idx is not None else 0.0
+            best_role, best_score = player_best_role[p_idx] if p_idx is not None else ("", 0.0)
+            rows.append((pos_label, name, sel_score, best_role, best_score, p_idx))
+            sel_scores.append(sel_score)
         else:
-            rows.append((pos_label, "", 0, "", 0))
-
-    placed_scores = [r[2] for r in rows if r[1]]
-    team_total = sum(placed_scores)
+            rows.append((pos_label, "", 0.0, "", 0.0, None))
+    
+    # Totals and averages
+    team_total = float(sum([r[2] for r in rows if r[5] is not None]))
+    placed_scores = [r[2] for r in rows if r[5] is not None]
     team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
-
-    def color_for_diff(diff, cap=400.0):
+    
+    # --- Color scaling: red (-400), white (0), green (+400) ---
+    def color_for_diff(diff, normalize=False, max_val=20.0, current_max_score=400.0):
+        """
+        diff: sel_score - team_avg
+        normalize: whether attributes were normalized
+        max_val: max attribute value (used if normalized)
+        current_max_score: original ±400 range for unnormalized
+        """
+        # Adjust cap based on normalization
+        cap = current_max_score
+        if normalize:
+            # scale normalized diff to match original 400 range
+            cap = current_max_score  # still ±400, diff scaled up by max_val
+            diff = diff * (current_max_score / max_val)  # scale to same visual range
+        
+        # Clamp diff to [-cap, cap]
         diff = max(-cap, min(cap, diff))
+        
+        # interpolate
         if diff > 0:
+            # white to green
             ratio = diff / cap
-            r = int(255 * (1 - ratio)); g = 255; b = int(255 * (1 - ratio))
+            r = int(255 * (1 - ratio))
+            g = 255
+            b = int(255 * (1 - ratio))
         elif diff < 0:
+            # white to red
             ratio = -diff / cap
-            r = 255; g = int(255 * (1 - ratio)); b = int(255 * (1 - ratio))
+            r = 255
+            g = int(255 * (1 - ratio))
+            b = int(255 * (1 - ratio))
         else:
             r = g = b = 255
+        
         return f"rgb({r},{g},{b})"
-
-    for pos_label, name, sel_score, best_role, best_role_score in rows:
+    
+    # Format lines, grouped with blank lines
+    lines = []
+    group_breaks = {"GK", "LB", "DM2", "AML"}  # after these, insert blank line
+    
+    for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
             diff = sel_score - team_avg
-            color = color_for_diff(diff)
+            color = color_for_diff(diff, normalize=normalize, max_val=max_val)
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
-            lines.append(f"{pos_label} | {name_html} | {sel_score} | {best_role} | {best_role_score}")
+            sel_score_int = int(round(float(sel_score)))
+            best_score_int = int(round(float(best_score)))
+            line = f"{pos_label} | {name_html} | {sel_score_int} | {best_role} | {best_score_int}"
         else:
-            lines.append(pos_label)
+            line = f"{pos_label}"
+        
+        lines.append(line)
+        
+        # Insert blank line for readability at key positions
+        if pos_label in group_breaks:
+            lines.append("")  # this is your empty line
+    
+    # Add totals at the bottom
     lines.append("")
-    lines.append(f"Team total score = {team_total} | Team average score = {int(round(team_avg))}")
-    return "<br>".join(lines)
+    lines.append(f"Team total score = {int(round(team_total))} | Team average score = {int(round(team_avg))}")
+    
+    return "<br>".join(lines), team_total
 
-first_lines = render_xi(first_choice)
+first_lines, first_total = render_xi(first_choice)
+
+# second XI (exclude players used in first)
+used_player_indices = set(first_choice.values())
+remaining_players = [i for i in all_player_indices if i not in used_player_indices]
+second_choice = choose_starting_xi(remaining_players)
+
+# if returned indices refer to available_player_indices ordering, ensure mapping uses those original indices
+# our function already maps to original indices when using scipy; when using greedy it also returns original indices.
+second_lines, second_total = render_xi(second_choice)
+
+# First Starting XI
+st.markdown(
+    '<div style="font-size:16px; font-weight:bold">'
+    '<span title="Everybody\'s best role is ST since it\'s the easiest position to get rating in, therefore this is the second best position instead with their second best rating.">'
+    '🛈 First Starting XI</span></div>',
+    unsafe_allow_html=True
+)
 st.markdown(first_lines, unsafe_allow_html=True)
 
-# Second XI (exclude used)
-used_idx = set(first_choice.values())
-remaining = [i for i in all_player_indices if i not in used_idx]
-second_choice = choose_starting_xi(remaining)
-second_lines = render_xi(second_choice)
 st.markdown("---")
+
+# Second Starting XI
+st.markdown(
+    '<div style="font-size:16px; font-weight:bold">'
+    '<span title="Everybody\'s best role is ST since it\'s the easiest position to get rating in, therefore this is the second best position instead with their second best rating.">'
+    '🛈 Second Starting XI</span></div>',
+    unsafe_allow_html=True
+)
 st.markdown(second_lines, unsafe_allow_html=True)
 
-# downloads: CSV and parquet (if pyarrow available)
+# final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
-
-try:
-    import pyarrow  # type: ignore
-    buf = io.BytesIO()
-    df_out_sorted.to_parquet(buf, index=False)
-    st.download_button("Download ranked Parquet (full)", buf.getvalue(), file_name=f"players_ranked_{role}.parquet")
-except Exception:
-    pass
-
-st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
-
-
-
-
-
-
-
-
-
