@@ -255,9 +255,6 @@ for uploaded in uploaded_files:
 
     dfs.append(df)
 
-df = pd.DataFrame(rows)
-df = df.drop_duplicates(subset=["Name", "Position"], ignore_index=True)
-
 if not dfs:
     st.error("No valid player data parsed from any uploaded file.")
     st.stop()
@@ -550,6 +547,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
