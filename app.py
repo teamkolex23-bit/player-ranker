@@ -466,7 +466,7 @@ def render_xi(chosen_map):
     lines.append("")
     lines.append(f"Team total score = {int(round(team_total))} | Team average score = {int(round(team_avg))}")
 
-    return "\n".join(lines), team_total
+    return "<br>".join(lines), team_total
 
 first_lines, first_total = render_xi(first_choice)
 
@@ -490,6 +490,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
