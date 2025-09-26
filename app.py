@@ -499,72 +499,26 @@ second_choice = choose_starting_xi(remaining_players)
 # our function already maps to original indices when using scipy; when using greedy it also returns original indices.
 second_lines, second_total = render_xi(second_choice)
 
-info_text = "Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating."
+info_text = (
+    "Everybody's best role is ST since it's the easiest position to get rating in, "
+    "therefore this is the second best position instead with their second best rating."
+)
 
-# First Starting XI header
 st.markdown(
-    f"""
-    <h2 style="display:inline">First Starting XI</h2>
-    <button style="
-        border:none;
-        background:none;
-        color:#555;
-        font-size:16px;
-        cursor:help;
-        padding:0;
-        margin-left:5px;"
-        title="{info_text}"
-    >ℹ️</button>
-    """,
+    f"## First Starting XI <span title='{info_text}'></span>",
     unsafe_allow_html=True
 )
 st.markdown(first_lines, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# Second Starting XI header
 st.markdown(
-    f"""
-    <h2 style="display:inline">Second Starting XI</h2>
-    <button style="
-        border:none;
-        background:none;
-        color:#555;
-        font-size:16px;
-        cursor:help;
-        padding:0;
-        margin-left:5px;"
-        title="{info_text}"
-    >ℹ️</button>
-    """,
+    f"## Second Starting XI <span title='{info_text}'></span>",
     unsafe_allow_html=True
 )
 st.markdown(second_lines, unsafe_allow_html=True)
 
-
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
