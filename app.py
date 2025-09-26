@@ -361,56 +361,70 @@ except Exception:
 
 
 def choose_starting_xi(available_player_indices):
-    m = max(len(available_player_indices), n_positions)
+    # make a plain Python list of indices (defensive)
+    avail = list(available_player_indices)
+
+    # m = number of rows for cost matrix (pad if fewer players than positions)
+    m = max(len(avail), n_positions)
     cost = np.zeros((m, n_positions), dtype=float)
-    # cost as negative scores for minimization
-    if len(available_player_indices) > 0:
-        cost[:len(available_player_indices), :] = -score_matrix[available_player_indices, :]
-    # default zeros for dummy rows
+
+    # fill cost matrix rows for real players (negative scores for minimization)
+    if len(avail) > 0:
+        # fancy indexing with a Python list is fine here
+        cost[:len(avail), :] = -score_matrix[avail, :]
+
+    # If SciPy's Hungarian algorithm is not available, fallback to greedy assignment
     if linear_sum_assignment is None:
-        # fallback greedy
         chosen = {}
         used_players = set()
         for p_idx in range(n_positions):
             best_p = None
             best_sc = -1e9
-            for i_idx in available_player_indices:
+            for i_idx in avail:
                 if i_idx in used_players:
                     continue
-                sc = score_matrix[i_idx, p_idx]
+                sc = float(score_matrix[int(i_idx), p_idx])
                 if sc > best_sc:
                     best_sc = sc
-                    best_p = i_idx
+                    best_p = int(i_idx)
             if best_p is not None:
-                chosen[p_idx] = best_p
+                chosen[p_idx] = int(best_p)
                 used_players.add(best_p)
         return chosen
     else:
+        # use Hungarian algorithm; row_ind refers to rows in cost
         row_ind, col_ind = linear_sum_assignment(cost)
         chosen = {}
         for r, c in zip(row_ind, col_ind):
-            if r < len(available_player_indices) and c < n_positions:
-                chosen[c] = available_player_indices[r]
+            # only accept assignments that map to an actual (non-dummy) player row
+            if r < len(avail) and c < n_positions:
+                chosen[c] = int(avail[r])
         return chosen
-
 # first XI
 all_player_indices = list(range(n_players))
 first_choice = choose_starting_xi(all_player_indices)
+first_choice = {int(k): int(v) for k, v in first_choice.items()}
 
 # compute display for a chosen XI
 def render_xi(chosen_map):
     rows = []
     sel_scores = []
+
     for pos_idx, (pos_label, role_key) in enumerate(positions):
         if pos_idx in chosen_map:
-            p_idx = chosen_map[pos_idx]
-            name = player_names[p_idx]
-            sel_score = score_matrix[p_idx, pos_idx]
+            # defensive coercions
+            p_idx = int(chosen_map[pos_idx])
+            name = str(player_names[p_idx])
+            sel_score = float(score_matrix[p_idx, pos_idx])
             best_role, best_score = player_best_role[p_idx]
+            best_score = float(best_score)
+
             rows.append((pos_label, name, sel_score, best_role, best_score, p_idx))
             sel_scores.append(sel_score)
         else:
             rows.append((pos_label, "", 0.0, "", 0.0, None))
+
+    # team totals and average (defensive for empty)
     team_total = float(sum([r[2] for r in rows if r[5] is not None]))
     placed_scores = [r[2] for r in rows if r[5] is not None]
     team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
@@ -432,10 +446,9 @@ def render_xi(chosen_map):
         if name:
             diff = sel_score - team_avg
             color = color_for_diff(diff)
-            name_html = f"<span style='color:{color}; font-weight:600'>{st.markdown.__self__ if False else name}</span>"
-            # st.markdown.__self__ trick avoided; use safe name
+            # outer string uses double quotes, inner HTML uses single quotes — no escaping needed
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
-            lines.append(f"{pos_label} | {name_html} | {int(round(sel_score))} | {best_role} | {int(round(best_score))}")
+            lines.append(f"{pos_label} | {name_html} | {int(round(float(sel_score)))} | {best_role} | {int(round(float(best_score)))}")
         else:
             lines.append(f"{pos_label} |  |  |  | ")
             return "\n".join(lines), team_total
@@ -446,6 +459,7 @@ first_lines, first_total = render_xi(first_choice)
 used_player_indices = set(first_choice.values())
 remaining_players = [i for i in all_player_indices if i not in used_player_indices]
 second_choice = choose_starting_xi(remaining_players)
+second_choice = {int(k): int(v) for k, v in second_choice.items()}
 # if returned indices refer to available_player_indices ordering, ensure mapping uses those original indices
 # our function already maps to original indices when using scipy; when using greedy it also returns original indices.
 second_lines, second_total = render_xi(second_choice)
@@ -462,5 +476,6 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
