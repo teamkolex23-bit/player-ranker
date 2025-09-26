@@ -428,26 +428,32 @@ def render_xi(chosen_map):
 
     # --- Color scaling: red (-400), white (0), green (+400) ---
     def color_for_diff(diff, normalize=False, max_val=20.0):
-        # Determine cap dynamically
-        # If normalized, assume max possible score is roughly sum(weights)
-        # If not normalized, keep original ±400
+        # Determine cap
         cap = 400.0
         if normalize:
-            cap = max_val * 10  # tweak 10 if your weights sum differently
+            # Max possible score roughly sum(weights) * (attr / max_val)
+            cap = max_val * 10  # tweak based on your weights sum
 
-        ratio = max(-1.0, min(1.0, diff / cap))
+        # Clamp diff to [-cap, cap]
+        diff = max(-cap, min(cap, diff))
 
-        if ratio > 0:
-            g = int(255 * ratio)  # green increases toward +cap
-            r = 255 - g
-            return f"rgb({r},{g},0)"
-        elif ratio < 0:
-            r = int(255 * abs(ratio))  # red increases toward -cap
-            g = 255 - r
-            return f"rgb({r},{g},0)"
+        # interpolate
+        if diff > 0:
+            # white to green
+            ratio = diff / cap
+            r = int(255 * (1 - ratio))
+            g = 255
+            b = int(255 * (1 - ratio))
+        elif diff < 0:
+            # white to red
+            ratio = -diff / cap
+            r = 255
+            g = int(255 * (1 - ratio))
+            b = int(255 * (1 - ratio))
         else:
-            return "rgb(255,255,255)"  # white for zero diff
+            r = g = b = 255
 
+        return f"rgb({r},{g},{b})"
 
     # Format lines, grouped with blank lines
     lines = []
@@ -498,6 +504,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
