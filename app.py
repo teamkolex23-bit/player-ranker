@@ -499,33 +499,23 @@ second_choice = choose_starting_xi(remaining_players)
 # our function already maps to original indices when using scipy; when using greedy it also returns original indices.
 second_lines, second_total = render_xi(second_choice)
 
-second_lines, second_total = render_xi(second_choice)
+info_text = (
+    "Everybody's best role is ST since it's the easiest position to get rating in, "
+    "therefore this is the second best position instead with their second best rating."
+)
 
-# Info text
-hover_text = "Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating."
-
-# First Starting XI with hover info
+# First Starting XI
 st.markdown(
-    f"""
-    <div style="font-weight:bold; font-size:20px;">
-        First Starting XI
-        <span style="font-weight:bold; font-size:20px; cursor: help; color:black; text-decoration:none; display:inline-block;" title="{hover_text}">[?]</span>
-    </div>
-    """,
+    f"🛈 <span title='{info_text}'>First Starting XI</span>",
     unsafe_allow_html=True
 )
 st.markdown(first_lines, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# Second Starting XI with hover info
+# Second Starting XI
 st.markdown(
-    f"""
-    <div style="font-weight:bold; font-size:20px;">
-        Second Starting XI
-        <span style="font-weight:bold; font-size:20px; cursor: help; color:black; text-decoration:none; display:inline-block;" title="{hover_text}">[?]</span>
-    </div>
-    """,
+    f"🛈 <span title='{info_text}'>Second Starting XI</span>",
     unsafe_allow_html=True
 )
 st.markdown(second_lines, unsafe_allow_html=True)
@@ -533,6 +523,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
