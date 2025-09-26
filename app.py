@@ -442,13 +442,9 @@ def render_xi(chosen_map):
         return f"rgb({r},{g},{b})"
 
     # Format lines, grouped with blank lines
-    order = [
-        "GK", "",
-        "RB", "CB1", "CB2", "LB", "",
-        "DM1", "DM2", "",
-        "AMR", "AMC", "AML", "",
-        "ST"
-    ]
+    lines = []
+    group_breaks = {"GK", "LB", "DM", "AML"}  # after these, insert blank line
+
     for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
             diff = sel_score - team_avg
@@ -463,8 +459,8 @@ def render_xi(chosen_map):
         lines.append(line)
 
         # Insert blank line for readability at key positions
-        if pos_label in group_breaks:
-            lines.append("")
+    if pos_label in group_breaks:
+        lines.append("")  # this is your empty line
 
     # Add totals at the bottom
     lines.append("")
@@ -494,6 +490,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
