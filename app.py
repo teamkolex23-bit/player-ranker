@@ -506,7 +506,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 # Bold, large text with hover tooltip
 st.markdown(
     f"<span style='font-weight:bold; font-size:20px;' title='{info_text}'>First Starting XI</span>",
@@ -525,6 +524,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
