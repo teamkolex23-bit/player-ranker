@@ -245,13 +245,13 @@ if not available_attrs:
     st.error("No matching attribute columns found in the uploaded table. Detected columns: " + ", ".join(list(df.columns)))
     st.stop()
 
-# normalization control with hoverable help directly on the checkbox
+# normalization control with hoverable help directly on the 
 norm_help = (
     "Normalization divides attribute values by an assumed maximum (e.g. 20), "
     "turning raw attribute scores into a 0..1 range so weights act proportionally. "
     "If your attributes use a different top value (e.g. 10), change the assumed max to rescale attributes."
 )
-normalize = st.checkbox("Normalize attribute values (divide by max)", value=False, help=norm_help)
+normalize = st.("Normalize attribute values (divide by max)", value=False, help=norm_help)
 max_val = 20.0
 if normalize:
     max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
@@ -504,18 +504,22 @@ info_text = (
     "therefore this is the second best position instead with their second best rating."
 )
 
-# Display as bold text with hover tooltip exactly like norm_help
-st.checkbox("First Starting XI", value=False, help=info_text, disabled=True)
+# Bold, large text with hover tooltip
+st.markdown(
+    f"<span style='font-weight:bold; font-size:20px;' title='{info_text}'>First Starting XI</span>",
+    unsafe_allow_html=True
+)
 st.markdown(first_lines, unsafe_allow_html=True)
 
 st.markdown("---")
 
-st.checkbox("Second Starting XI", value=False, help=info_text, disabled=True)
+st.markdown(
+    f"<span style='font-weight:bold; font-size:20px;' title='{info_text}'>Second Starting XI</span>",
+    unsafe_allow_html=True
+)
 st.markdown(second_lines, unsafe_allow_html=True)
 
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
-
-
 
