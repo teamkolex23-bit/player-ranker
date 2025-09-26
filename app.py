@@ -213,14 +213,12 @@ def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
 # Hoverable tips right below the title
 st.markdown(
     '''
-    <div style="font-size:20px; margin-bottom:8px;">
-        <span title="Maximum of 260 players can be loaded so limit your search in FM to narrow it down. 
-        I personally segment it into age groups and personality/media handling style but you can also block certain regions or divisions, 
-        like only having top 5 from the 2nd division up etc">
+    <div style="font-size:16px; margin-bottom:8px;">
+        <span title="Maximum of 260 players can be loaded so limit your search in FM to narrow it down. I personally segment it into age groups and personality/media handling style but you can also block certain regions or divisions, like only having top 5 nations from the 2nd division up etc">
         🛈 Info before uploading
         </span>
     </div>
-    <div style="font-size:20px; margin-bottom:4px;">
+    <div style="font-size:16px; margin-bottom:4px;">
         <span title="Go to https://fmarenacalc.com, follow the exact instructions there, upload the html file on our website since their weight table is inaccurate.">
         🛈 How and what should I upload?
         </span>
@@ -536,6 +534,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
