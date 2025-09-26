@@ -20,54 +20,114 @@ CANONICAL_ATTRIBUTES = [
 
 WEIGHTS_BY_ROLE = {
     "GK":{
-        "Decisions":10,"Agility":8,"Reflexes":8,"Handling":8,"Concentration":6,"Bravery":6,
-        "Acceleration":6,"Command of Area":6,"Aerial Reach":6,"Positioning":5,"Kicking":5,
-        "Communication":5,"Strength":4,"One on Ones":4,"Pace":3
+        "Corners":0.0,"Crossing":0.0,"Dribbling":0.0,"Finishing":0.0,"First Touch":0.0,"Free Kick Taking":0.0,
+        "Heading":1.0,"Long Shots":0.0,"Long Throws":0.0,"Marking":0.0,"Passing":0.0,"Penalty Taking":0.0,
+        "Tackling":0.0,"Technique":1.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":6.0,"Composure":2.0,
+        "Concentration":6.0,"Decisions":10.0,"Determination":0.0,"Flair":0.0,"Leadership":2.0,"Off The Ball":0.0,
+        "Positioning":5.0,"Teamwork":2.0,"Vision":1.0,"Work Rate":1.0,"Acceleration":6.0,"Agility":8.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":3.0,"Stamina":1.0,"Strength":4.0,
+        "Weaker Foot":3.0,"Aerial Reach":6.0,"Command of Area":6.0,"Communication":5.0,"Eccentricity":0.0,
+        "Handling":8.0,"Kicking":5.0,"One on Ones":4.0,"Passing":3.0,"Punching (Tendency)":0.0,"Reflexes":8.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":3.0
     },
     "DL/DR":{
-        "Acceleration":7,"Decisions":7,"Agility":6,"Stamina":6,"Pace":5,"Concentration":4,
-        "Strength":4,"Positioning":4,"Tackling":4,"First Touch":3,"Anticipation":3,"Marking":3,
-        "Composure":2,"Bravery":2,"Balance":2
-    },
-    "WBL/WBR":{
-        "Acceleration":8,"Stamina":7,"Pace":6,"Agility":5,"Decisions":5,"Strength":4,
-        "Concentration":3,"Technique":3,"First Touch":3,"Positioning":3,"Anticipation":3,
-        "Tackling":3,"Passing":3,"Crossing":3,"Composure":2
-    },
-    "ML/MR":{
-        "Acceleration":8,"Agility":6,"Pace":6,"Stamina":5,"Decisions":5,"Crossing":5,
-        "Technique":4,"First Touch":4,"Composure":3,"Strength":3,"Work Rate":3,
-        "Anticipation":3,"Vision":3,"Passing":3,"Dribbling":3
-    },
-    "AML/AMR":{
-        "Pace":10,"Acceleration":10,"Stamina":7,"Agility":6,"First Touch":5,"Decisions":5,
-        "Dribbling":5,"Crossing":5,"Technique":4,"Composure":3,"Strength":3,"Work Rate":3,
-        "Anticipation":3,"Vision":3,"Concentration":2
+        "Corners":1.0,"Crossing":2.0,"Dribbling":1.0,"Finishing":1.0,"First Touch":3.0,"Free Kick Taking":1.0,
+        "Heading":2.0,"Long Shots":1.0,"Long Throws":1.0,"Marking":3.0,"Passing":2.0,"Penalty Taking":1.0,
+        "Tackling":4.0,"Technique":2.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":2.0,"Composure":2.0,
+        "Concentration":4.0,"Decisions":7.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":1.0,
+        "Positioning":4.0,"Teamwork":2.0,"Vision":2.0,"Work Rate":2.0,"Acceleration":7.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":2.0,"Natural Fitness":0.0,"Pace":5.0,"Stamina":6.0,"Strength":4.0,
+        "Weaker Foot":4.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
     },
     "CB":{
-        "Decisions":10,"Positioning":8,"Marking":8,"Agility":6,"Jumping Reach":6,"Strength":6,
-        "Acceleration":6,"Pace":5,"Anticipation":5,"Tackling":5,"Heading":5,"Concentration":4,
-        "Stamina":3,"Composure":2,"Bravery":2
+        "Corners":1.0,"Crossing":1.0,"Dribbling":1.0,"Finishing":1.0,"First Touch":2.0,"Free Kick Taking":1.0,
+        "Heading":5.0,"Long Shots":1.0,"Long Throws":1.0,"Marking":8.0,"Passing":2.0,"Penalty Taking":1.0,
+        "Tackling":5.0,"Technique":1.0,"Aggression":0.0,"Anticipation":5.0,"Bravery":2.0,"Composure":2.0,
+        "Concentration":4.0,"Decisions":10.0,"Determination":0.0,"Flair":0.0,"Leadership":2.0,"Off The Ball":1.0,
+        "Positioning":8.0,"Teamwork":1.0,"Vision":1.0,"Work Rate":2.0,"Acceleration":6.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":6.0,"Natural Fitness":0.0,"Pace":5.0,"Stamina":3.0,"Strength":6.0,
+        "Weaker Foot":4.5,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
+    },
+    "WBL/WBR":{
+        "Corners":1.0,"Crossing":3.0,"Dribbling":2.0,"Finishing":1.0,"First Touch":3.0,"Free Kick Taking":1.0,
+        "Heading":1.0,"Long Shots":1.0,"Long Throws":1.0,"Marking":2.0,"Passing":3.0,"Penalty Taking":1.0,
+        "Tackling":3.0,"Technique":3.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":2.0,
+        "Concentration":3.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":2.0,
+        "Positioning":3.0,"Teamwork":2.0,"Vision":2.0,"Work Rate":2.0,"Acceleration":8.0,"Agility":5.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":6.0,"Stamina":7.0,"Strength":4.0,
+        "Weaker Foot":4.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
     },
     "DM":{
-        "Decisions":8,"Tackling":7,"Agility":6,"Acceleration":6,"Strength":5,"Positioning":5,
-        "Anticipation":5,"Pace":4,"Stamina":4,"Work Rate":4,"First Touch":4,"Vision":4,
-        "Passing":4,"Concentration":3,"Technique":3
+        "Corners":1.0,"Crossing":1.0,"Dribbling":2.0,"Finishing":2.0,"First Touch":4.0,"Free Kick Taking":1.0,
+        "Heading":1.0,"Long Shots":3.0,"Long Throws":1.0,"Marking":3.0,"Passing":4.0,"Penalty Taking":1.0,
+        "Tackling":7.0,"Technique":3.0,"Aggression":0.0,"Anticipation":5.0,"Bravery":1.0,"Composure":2.0,
+        "Concentration":3.0,"Decisions":8.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":1.0,
+        "Positioning":5.0,"Teamwork":2.0,"Vision":4.0,"Work Rate":4.0,"Acceleration":6.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":4.0,"Stamina":4.0,"Strength":5.0,
+        "Weaker Foot":5.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
+    },
+    "ML/MR":{
+        "Corners":1.0,"Crossing":5.0,"Dribbling":3.0,"Finishing":2.0,"First Touch":4.0,"Free Kick Taking":1.0,
+        "Heading":1.0,"Long Shots":2.0,"Long Throws":1.0,"Marking":1.0,"Passing":3.0,"Penalty Taking":1.0,
+        "Tackling":2.0,"Technique":4.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":2.0,
+        "Concentration":2.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":2.0,
+        "Positioning":1.0,"Teamwork":2.0,"Vision":3.0,"Work Rate":3.0,"Acceleration":8.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":6.0,"Stamina":5.0,"Strength":3.0,
+        "Weaker Foot":5.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
     },
     "CM":{
-        "Decisions":7,"Agility":6,"Stamina":6,"Acceleration":6,"First Touch":6,"Vision":6,
-        "Passing":6,"Pace":5,"Strength":4,"Technique":4,"Composure":3,"Work Rate":3,
-        "Positioning":3,"Anticipation":3,"Tackling":3
+        "Corners":1.0,"Crossing":1.0,"Dribbling":2.0,"Finishing":2.0,"First Touch":6.0,"Free Kick Taking":1.0,
+        "Heading":1.0,"Long Shots":3.0,"Long Throws":1.0,"Marking":3.0,"Passing":6.0,"Penalty Taking":1.0,
+        "Tackling":3.0,"Technique":4.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":3.0,
+        "Concentration":2.0,"Decisions":7.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":3.0,
+        "Positioning":3.0,"Teamwork":2.0,"Vision":6.0,"Work Rate":3.0,"Acceleration":6.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":5.0,"Stamina":6.0,"Strength":4.0,
+        "Weaker Foot":6.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
+    },
+    "AML/AMR":{
+        "Corners":1.0,"Crossing":5.0,"Dribbling":5.0,"Finishing":2.0,"First Touch":5.0,"Free Kick Taking":1.0,
+        "Heading":1.0,"Long Shots":2.0,"Long Throws":1.0,"Marking":1.0,"Passing":2.0,"Penalty Taking":1.0,
+        "Tackling":2.0,"Technique":4.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":3.0,
+        "Concentration":2.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":2.0,
+        "Positioning":1.0,"Teamwork":2.0,"Vision":3.0,"Work Rate":3.0,"Acceleration":10.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":10.0,"Stamina":7.0,"Strength":3.0,
+        "Weaker Foot":5.5,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
     },
     "AMC":{
-        "Acceleration":9,"Pace":7,"Agility":6,"Stamina":6,"Decisions":6,"Vision":6,
-        "Technique":5,"First Touch":5,"Passing":4,"Composure":3,"Strength":3,"Work Rate":3,
-        "Anticipation":3,"Off The Ball":3,"Long Shots":3
+        "Corners":1.0,"Crossing":1.0,"Dribbling":3.0,"Finishing":3.0,"First Touch":5.0,"Free Kick Taking":1.0,
+        "Heading":1.0,"Long Shots":3.0,"Long Throws":1.0,"Marking":1.0,"Passing":4.0,"Penalty Taking":1.0,
+        "Tackling":2.0,"Technique":5.0,"Aggression":0.0,"Anticipation":3.0,"Bravery":1.0,"Composure":3.0,
+        "Concentration":2.0,"Decisions":6.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":3.0,
+        "Positioning":2.0,"Teamwork":2.0,"Vision":6.0,"Work Rate":3.0,"Acceleration":9.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":7.0,"Stamina":6.0,"Strength":3.0,
+        "Weaker Foot":7.0,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
     },
     "ST":{
-        "Acceleration":10,"Finishing":8,"Pace":7,"Composure":6,"Agility":6,"Stamina":6,
-        "Strength":6,"First Touch":6,"Off The Ball":6,"Heading":6,"Jumping Reach":5,
-        "Decisions":5,"Anticipation":5,"Dribbling":5,"Technique":4
+        "Corners":1.0,"Crossing":2.0,"Dribbling":5.0,"Finishing":8.0,"First Touch":6.0,"Free Kick Taking":1.0,
+        "Heading":6.0,"Long Shots":2.0,"Long Throws":1.0,"Marking":1.0,"Passing":2.0,"Penalty Taking":1.0,
+        "Tackling":1.0,"Technique":4.0,"Aggression":0.0,"Anticipation":5.0,"Bravery":1.0,"Composure":6.0,
+        "Concentration":2.0,"Decisions":5.0,"Determination":0.0,"Flair":0.0,"Leadership":1.0,"Off The Ball":6.0,
+        "Positioning":2.0,"Teamwork":1.0,"Vision":2.0,"Work Rate":2.0,"Acceleration":10.0,"Agility":6.0,
+        "Balance":2.0,"Jumping Reach":5.0,"Natural Fitness":0.0,"Pace":7.0,"Stamina":6.0,"Strength":6.0,
+        "Weaker Foot":7.5,"Aerial Reach":0.0,"Command of Area":0.0,"Communication":0.0,"Eccentricity":0.0,
+        "Handling":0.0,"Kicking":0.0,"One on Ones":0.0,"Punching (Tendency)":0.0,"Reflexes":0.0,
+        "Rushing Out (Tendency)":0.0,"Throwing":0.0
     }
 }
 
@@ -241,7 +301,7 @@ for i in range(0, len(roles), per_row):
             tmp_sorted = tmp_sorted.reset_index(drop=True)
             tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
             tiny = tmp_sorted[[c for c in ["Rank","Name","Age","Transfer Value","Score"] if c in tmp_sorted.columns]].copy()
-            tiny["Score"] = tiny["Score"].round(4)
+            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
             st.markdown(f"**{r}**")
             st.table(tiny)
 
