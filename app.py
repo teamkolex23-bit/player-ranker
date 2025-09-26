@@ -27,7 +27,7 @@ WEIGHTS_BY_ROLE = {
         "Positioning":5.0,"Teamwork":2.0,"Vision":1.0,"Work Rate":1.0,"Acceleration":6.0,"Agility":8.0,
         "Balance":2.0,"Jumping Reach":1.0,"Natural Fitness":0.0,"Pace":3.0,"Stamina":1.0,"Strength":4.0,
         "Weaker Foot":3.0,"Aerial Reach":6.0,"Command of Area":6.0,"Communication":5.0,"Eccentricity":0.0,
-        "Handling":8.0,"Kicking":5.0,"One on Ones":4.0,"Passing":3.0,"Punching (Tendency)":0.0,"Reflexes":8.0,
+        "Handling":8.0,"Kicking":5.0,"One on Ones":4.0,"Punching (Tendency)":0.0,"Reflexes":8.0,
         "Rushing Out (Tendency)":0.0,"Throwing":3.0
     },
     "DL/DR":{
@@ -210,7 +210,7 @@ def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
                 merged[col] = subset.apply(lambda r: next((v for v in r if isinstance(v, str) and v.strip()), ""), axis=1)
     return merged
 
-# Uploader with hover help (info) — small tooltip next to uploader
+# Uploader with hover help (info)
 uploader_help = (
     "Go to https://fmarenacalc.com, follow the exact instructions there, upload the html file on our website since their weight table is inaccurate"
 )
@@ -235,12 +235,9 @@ if df is None:
     st.error(f"Parsing failed: {err}")
     st.stop()
 
-# dedupe and merge duplicate columns
+# merge duplicate columns and reset index for simple indexing
 df = merge_duplicate_columns(df)
-
-# main role selection
-ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
+df = df.reset_index(drop=True)
 
 # determine available attributes present in the upload
 available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
@@ -262,21 +259,22 @@ if normalize:
 attrs_df = df[available_attrs].fillna(0).astype(float)
 attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
 
-# get weights for selected role and compute score
+# compute role scores for the currently selected role (single select box)
+ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
+role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
 selected_weights = WEIGHTS_BY_ROLE.get(role, {})
 weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+current_scores = attrs_norm.values.dot(weights.values.astype(float))
 
-scores = attrs_norm.values.dot(weights.values.astype(float))
+# create main ranked dataframe
 df_out = df.copy()
-df_out["Score"] = scores
-
+df_out["Score"] = current_scores
 df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
-
-# ensure ranking index starts at 1
+# ranking starts at 1
 ranked = df_out_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 
-# show the selected-role top list (Name, Position, Age, Transfer Value, Score)
+# show selected-role top list
 cols_to_show = [c for c in ["Rank","Name","Position","Age","Transfer Value","Score"] if c in ranked.columns]
 st.subheader(f"Top players for role: {role} (sorted by Score)")
 st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]].head(200))
@@ -284,14 +282,12 @@ st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.co
 # additional compact top-10 per role
 st.markdown("---")
 st.subheader("Top 10 — every role (compact)")
-# layout in columns to keep compact, 4 per row
 per_row = 4
 roles = ROLE_OPTIONS
 for i in range(0, len(roles), per_row):
     cols = st.columns(per_row)
     for j, r in enumerate(roles[i:i+per_row]):
         with cols[j]:
-            # compute ranking for role r
             rw = WEIGHTS_BY_ROLE.get(r, {})
             w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
             sc = attrs_norm.values.dot(w.values.astype(float))
@@ -305,8 +301,165 @@ for i in range(0, len(roles), per_row):
             st.markdown(f"**{r}**")
             st.table(tiny)
 
-# download full CSV
+# Starting XI selection (optimal assignment per formation)
+st.markdown("---")
+st.subheader("Best Starting XIs")
+
+# formation mapping: position label -> role key
+positions = [
+    ("GK", "GK"),
+    ("RB", "DL/DR"),
+    ("CB1", "CB"),
+    ("CB2", "CB"),
+    ("LB", "DL/DR"),
+    ("DM1", "DM"),
+    ("DM2", "DM"),
+    ("AMR", "AML/AMR"),
+    ("AMC", "AMC"),
+    ("AML", "AML/AMR"),
+    ("ST", "ST"),
+]
+
+n_players = len(df)
+n_positions = len(positions)
+player_names = df["Name"].astype(str).tolist()
+
+# precompute role weight vectors aligned with available_attrs
+role_weight_vectors = {}
+for _, role_key in positions:
+    rw = WEIGHTS_BY_ROLE.get(role_key, {})
+    role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
+
+# compute score matrix players x positions
+score_matrix = np.zeros((n_players, n_positions), dtype=float)
+for i_idx in range(n_players):
+    player_attr_vals = attrs_norm.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
+    for p_idx, (_, role_key) in enumerate(positions):
+        w = role_weight_vectors[role_key]
+        score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
+
+# helper: find best role for each player across all defined roles
+all_role_keys = list(WEIGHTS_BY_ROLE.keys())
+all_role_vectors = {rk: np.array([float(WEIGHTS_BY_ROLE[rk].get(a, 0.0)) for a in available_attrs], dtype=float) for rk in all_role_keys}
+player_best_role = []
+for i_idx in range(n_players):
+    player_attr_vals = attrs_norm.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
+    best_score = -1e9
+    best_role = None
+    for rk, vec in all_role_vectors.items():
+        sc = float(np.dot(player_attr_vals, vec))
+        if sc > best_score:
+            best_score = sc
+            best_role = rk
+    player_best_role.append((best_role, best_score))
+
+# assignment helper using Hungarian (scipy)
+try:
+    from scipy.optimize import linear_sum_assignment
+except Exception:
+    linear_sum_assignment = None
+
+
+def choose_starting_xi(available_player_indices):
+    m = max(len(available_player_indices), n_positions)
+    cost = np.zeros((m, n_positions), dtype=float)
+    # cost as negative scores for minimization
+    if len(available_player_indices) > 0:
+        cost[:len(available_player_indices), :] = -score_matrix[available_player_indices, :]
+    # default zeros for dummy rows
+    if linear_sum_assignment is None:
+        # fallback greedy
+        chosen = {}
+        used_players = set()
+        for p_idx in range(n_positions):
+            best_p = None
+            best_sc = -1e9
+            for i_idx in available_player_indices:
+                if i_idx in used_players:
+                    continue
+                sc = score_matrix[i_idx, p_idx]
+                if sc > best_sc:
+                    best_sc = sc
+                    best_p = i_idx
+            if best_p is not None:
+                chosen[p_idx] = best_p
+                used_players.add(best_p)
+        return chosen
+    else:
+        row_ind, col_ind = linear_sum_assignment(cost)
+        chosen = {}
+        for r, c in zip(row_ind, col_ind):
+            if r < len(available_player_indices) and c < n_positions:
+                chosen[c] = available_player_indices[r]
+        return chosen
+
+# first XI
+all_player_indices = list(range(n_players))
+first_choice = choose_starting_xi(all_player_indices)
+
+# compute display for a chosen XI
+def render_xi(chosen_map):
+    rows = []
+    sel_scores = []
+    for pos_idx, (pos_label, role_key) in enumerate(positions):
+        if pos_idx in chosen_map:
+            p_idx = chosen_map[pos_idx]
+            name = player_names[p_idx]
+            sel_score = score_matrix[p_idx, pos_idx]
+            best_role, best_score = player_best_role[p_idx]
+            rows.append((pos_label, name, sel_score, best_role, best_score, p_idx))
+            sel_scores.append(sel_score)
+        else:
+            rows.append((pos_label, "", 0.0, "", 0.0, None))
+    team_total = float(sum([r[2] for r in rows if r[5] is not None]))
+    placed_scores = [r[2] for r in rows if r[5] is not None]
+    team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
+
+    def color_for_diff(diff):
+        cap = 400.0
+        ratio = max(-1.0, min(1.0, diff / cap))
+        if ratio > 0:
+            g = int(55 + 200 * ratio)
+            return f"rgb(0,{g},0)"
+        elif ratio < 0:
+            r = int(55 + 200 * abs(ratio))
+            return f"rgb({r},0,0)"
+        else:
+            return "#000000"
+
+    lines = []
+    for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
+        if name:
+            diff = sel_score - team_avg
+            color = color_for_diff(diff)
+            name_html = f"<span style='color:{color}; font-weight:600'>{st.markdown.__self__ if False else name}</span>"
+            # st.markdown.__self__ trick avoided; use safe name
+            name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
+            lines.append(f"{pos_label} | {name_html} | {int(round(sel_score))} | {best_role} | {int(round(best_score))}")
+        else:
+            lines.append(f"{pos_label} |  |  |  | ")
+    return "
+".join(lines), team_total
+
+first_lines, first_total = render_xi(first_choice)
+
+# second XI (exclude players used in first)
+used_player_indices = set(first_choice.values())
+remaining_players = [i for i in all_player_indices if i not in used_player_indices]
+second_choice = choose_starting_xi(remaining_players)
+# if returned indices refer to available_player_indices ordering, ensure mapping uses those original indices
+# our function already maps to original indices when using scipy; when using greedy it also returns original indices.
+second_lines, second_total = render_xi(second_choice)
+
+st.markdown("**First Starting XI**")
+st.markdown(first_lines, unsafe_allow_html=True)
+st.markdown(f"**Team total score = {int(round(first_total))}**")
+
+st.markdown("---")
+st.markdown("**Second Starting XI**")
+st.markdown(second_lines, unsafe_allow_html=True)
+st.markdown(f"**Team total score = {int(round(second_total))}**")
+
+# final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
-
-# end
