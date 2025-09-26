@@ -334,8 +334,20 @@ n_players = len(df_out)
 n_positions = len(positions)
 
 # role weight vectors aligned to available_attrs
-all_role_vectors = {rk: np.array([float(WEIGHTS_BY_ROLE[rk].get(a, 0.0)) for a in available_attrs], dtype=float) for rk in WEIGHTS_BY_ROLE}
-role_weight_vectors = {role_key: np.array([float(WEIGHTS_BY_ROLE[role_key].get(a, 0.0)) for a in available_attrs], dtype=float) for _, role_key in positions}
+all_role_vectors = {
+    rk: np.array(
+        [float(dict(WEIGHTS_BY_ROLE.get(rk, {})).get(a, 0.0)) for a in available_attrs],
+        dtype=float
+    )
+    for rk in WEIGHTS_BY_ROLE
+}
+role_weight_vectors = {
+    role_key: np.array(
+        [float(dict(WEIGHTS_BY_ROLE.get(role_key, {})).get(a, 0.0)) for a in available_attrs],
+        dtype=float
+    )
+    for _, role_key in positions
+}
 
 # score matrix players x positions
 score_matrix = np.zeros((n_players, n_positions), dtype=float)
@@ -458,6 +470,7 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
 
 
