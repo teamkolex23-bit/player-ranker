@@ -246,7 +246,7 @@ for uploaded in uploaded_files:
         st.error(f"Parsing failed for {uploaded.name}: {err}")
         continue
 
-st.info(f"Loaded {len(df)} players from the uploaded file.")
+    st.info(f"Loaded {len(df)} players from the uploaded file.")
     
     # merge duplicate columns and reset index
     df = merge_duplicate_columns(df)
@@ -545,6 +545,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
