@@ -298,7 +298,11 @@ ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 # show selected-role top list
 cols_to_show = [c for c in ["Rank","Name","Position","Age","Transfer Value","Score"] if c in ranked.columns]
 st.subheader(f"Top players for role: {role} (sorted by Score)")
-st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]].head(200))
+st.dataframe(
+    ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]]
+        .head(200)
+        .style.hide(axis="index")
+)
 
 # additional compact top-10 per role
 st.markdown("---")
@@ -320,7 +324,7 @@ for i in range(0, len(roles), per_row):
             tiny = tmp_sorted[[c for c in ["Rank","Name","Age","Transfer Value","Score"] if c in tmp_sorted.columns]].copy()
             tiny["Score"] = tiny["Score"].round(0).astype('Int64')
             st.markdown(f"**{r}**")
-            st.table(tiny)
+            st.table(tiny.style.hide(axis="index"))
 
 # Starting XI selection (optimal assignment per formation)
 st.markdown("---")
@@ -545,6 +549,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
