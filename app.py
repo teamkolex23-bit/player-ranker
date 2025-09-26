@@ -298,7 +298,7 @@ ranked = df_out_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 cols_to_show = [c for c in ["Rank", "Name_display", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 st.subheader(f"Top players for role: {role} (sorted by Score)")
-st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]]
+st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]])
 
 # compact per-role top-10
 st.markdown("---")
@@ -458,6 +458,7 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
 
 
