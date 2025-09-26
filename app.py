@@ -144,6 +144,21 @@ ABBR_MAP = {
 
 
 def parse_players_from_html(html_text: str):
+
+    if not rows:
+        return None, "No data rows parsed from HTML table."
+
+    df = pd.DataFrame(rows)
+
+    # normalize player names to avoid duplicates caused by whitespace/case issues
+    df["Name"] = (
+        df["Name"]
+        .astype(str)
+        .str.strip()                             # remove leading/trailing spaces
+        .str.replace(r"\s+", " ", regex=True)   # collapse multiple spaces
+        .str.lower()                             # make lowercase for comparison
+    )
+
     soup = BeautifulSoup(html_text, "html.parser")
     table = soup.find("table")
     if table is None:
@@ -172,16 +187,6 @@ def parse_players_from_html(html_text: str):
 
     if not rows:
         return None, "No data rows parsed from HTML table."
-
-# normalize player names to avoid duplicates caused by whitespace/case issues
-    df_out["Name"] = (
-        df_out["Name"]
-        .astype(str)
-        .str.strip()             # remove leading/trailing spaces
-        .str.replace(r"\s+", " ", regex=True)  # collapse multiple spaces
-        .str.lower()             # make lowercase for comparison
-    )
-
     
     df = pd.DataFrame(rows)
     df = df.drop_duplicates(ignore_index=True)
@@ -382,7 +387,7 @@ df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_trans
 
 # sort by Score desc then TransferValue desc, then keep first per (Name, Position)
 df_out = df_out.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False])
-df_out = df_out.drop_duplicates(subset=["Name", "Position"], keep="first").reset_index(drop=True)
+df_out = df_out.drop_duplicates(subset=["Name"], keep="first").reset_index(drop=True)
 
 # cleanup helper column
 df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
@@ -644,6 +649,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
