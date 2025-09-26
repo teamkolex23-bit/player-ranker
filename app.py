@@ -293,6 +293,48 @@ df_out = df.copy()
 df_out["Score"] = current_scores
 
 # --- Deduplicate players: keep the row with highest Score; tie-break by Transfer Value; final tie -> random ---
+import re
+def parse_transfer_value(x):
+    s = "" if pd.isna(x) else str(x).strip()
+    if not s or s == "-" or s.lower() == "n/a":
+        return 0.0
+    s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
+    if s2 == "":
+        return 0.0
+    m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
+    if not m:
+        try:
+            return float(re.sub(r'[^0-9\.]', '', s))
+        except Exception:
+            return 0.0
+    num = m.group(1).replace(',', '')
+    try:
+        val = float(num)
+    except Exception:
+        val = 0.0
+    suf = m.group(2).lower()
+    if suf == 'k':
+        val *= 1_000.0
+    elif suf == 'm':
+        val *= 1_000_000.0
+    return val
+
+# randomize order so ties aren’t always broken the same way
+df_out = df_out.sample(frac=1, random_state=None).reset_index(drop=True)
+
+# compute numeric transfer value
+df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_transfer_value)
+
+# sort so best version comes first
+df_out = df_out.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False])
+
+# drop duplicate Name+Position, keeping the first (highest score, then highest transfer value)
+df_out = df_out.drop_duplicates(subset=["Name", "Position"], keep="first").reset_index(drop=True)
+
+# cleanup helper column
+df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
+
+# --- Deduplicate players: keep the row with highest Score; tie-break by Transfer Value; final tie -> random ---
 # helper: parse transfer value strings like "€1.2M", "1,200k", "-" into numeric (euros)
 def parse_transfer_value(x):
     s = "" if pd.isna(x) else str(x)
@@ -592,6 +634,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
