@@ -260,6 +260,34 @@ if not dfs:
     st.stop()
 
 df = pd.concat(dfs, ignore_index=True)
+
+# determine available attributes present in the upload
+available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
+if not available_attrs:
+    st.error("No matching attribute columns found in the uploaded table. Detected columns: " + ", ".join(list(df.columns)))
+    st.stop()
+
+# normalization control with hoverable help directly on the 
+norm_help = (
+    "Normalization divides attribute values by an assumed maximum (e.g. 20), "
+    "turning raw attribute scores into a 0..1 range so weights act proportionally. "
+    "If your attributes use a different top value (e.g. 10), change the assumed max to rescale attributes."
+)
+normalize = st.checkbox("Normalize attribute values (divide by max)", value=False, help=norm_help)
+max_val = 20.0
+if normalize:
+    max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
+
+attrs_df = df[available_attrs].fillna(0).astype(float)
+attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
+
+# compute role scores for the currently selected role (single select box)
+ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
+role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
+selected_weights = WEIGHTS_BY_ROLE.get(role, {})
+weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+current_scores = attrs_norm.values.dot(weights.values.astype(float))
+
 # create main ranked dataframe
 df_out = df.copy()
 df_out["Score"] = current_scores
@@ -310,41 +338,6 @@ df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
 # final sort by Score for display/export
 df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
 
-# ranking starts at 1
-ranked = df_out_sorted.copy()
-ranked.insert(0, "Rank", range(1, len(ranked) + 1))
-
-# determine available attributes present in the upload
-available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
-if not available_attrs:
-    st.error("No matching attribute columns found in the uploaded table. Detected columns: " + ", ".join(list(df.columns)))
-    st.stop()
-
-# normalization control with hoverable help directly on the 
-norm_help = (
-    "Normalization divides attribute values by an assumed maximum (e.g. 20), "
-    "turning raw attribute scores into a 0..1 range so weights act proportionally. "
-    "If your attributes use a different top value (e.g. 10), change the assumed max to rescale attributes."
-)
-normalize = st.checkbox("Normalize attribute values (divide by max)", value=False, help=norm_help)
-max_val = 20.0
-if normalize:
-    max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
-
-attrs_df = df[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
-
-# compute role scores for the currently selected role (single select box)
-ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-role = st.selectbox("Choose role to rank for", ROLE_OPTIONS, index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0)
-selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-current_scores = attrs_norm.values.dot(weights.values.astype(float))
-
-# create main ranked dataframe
-df_out = df.copy()
-df_out["Score"] = current_scores
-df_out_sorted = df_out.sort_values("Score", ascending=False).reset_index(drop=True)
 # ranking starts at 1
 ranked = df_out_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
@@ -599,6 +592,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
