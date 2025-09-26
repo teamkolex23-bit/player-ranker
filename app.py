@@ -394,7 +394,7 @@ ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 # show selected-role top list
 cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 st.subheader(f"Top players for role: {role} (sorted by Score)")
-st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]].head(200))
+st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]])
 
 # additional compact top-10 per role
 st.markdown("---")
@@ -656,6 +656,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
