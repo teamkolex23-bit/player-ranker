@@ -408,9 +408,11 @@ first_choice = choose_starting_xi(all_player_indices)
 def render_xi(chosen_map):
     rows = []
     sel_scores = []
+
+    # Collect player data row by row
     for pos_idx, (pos_label, role_key) in enumerate(positions):
         if pos_idx in chosen_map:
-            p_idx = chosen_map[pos_idx]
+            p_idx = int(chosen_map[pos_idx])
             name = str(player_names[p_idx]) if p_idx is not None else ""
             sel_score = float(score_matrix[p_idx, pos_idx]) if p_idx is not None else 0.0
             best_role, best_score = player_best_role[p_idx] if p_idx is not None else ("", 0.0)
@@ -419,23 +421,30 @@ def render_xi(chosen_map):
         else:
             rows.append((pos_label, "", 0.0, "", 0.0, None))
 
+    # Totals and averages
     team_total = float(sum([r[2] for r in rows if r[5] is not None]))
     placed_scores = [r[2] for r in rows if r[5] is not None]
     team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
 
+    # --- Color scaling: red (-400), white (0), green (+400) ---
     def color_for_diff(diff):
         cap = 400.0
-        ratio = max(-1.0, min(1.0, diff / cap))
-        if ratio > 0:
-            g = int(55 + 200 * ratio)
-            return f"rgb(0,{g},0)"
-        elif ratio < 0:
-            r = int(55 + 200 * abs(ratio))
-            return f"rgb({r},0,0)"
-        else:
-            return "#000000"
+        ratio = diff / cap  # -1.0 to +1.0
+        ratio = max(-1.0, min(1.0, ratio))
 
+        if ratio < 0:
+            # interpolate from white (255,255,255) to red (255,0,0)
+            r, g, b = 255, int(255 * (1 + ratio)), int(255 * (1 + ratio))
+        else:
+            # interpolate from white (255,255,255) to green (0,255,0)
+            r, g, b = int(255 * (1 - ratio)), 255, int(255 * (1 - ratio))
+
+        return f"rgb({r},{g},{b})"
+
+    # Format lines, grouped with blank lines
     lines = []
+    group_breaks = {"GK", "LB", "DM2", "AML"}  # after these, insert blank line
+
     for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
             diff = sel_score - team_avg
@@ -443,12 +452,21 @@ def render_xi(chosen_map):
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
             sel_score_int = int(round(float(sel_score)))
             best_score_int = int(round(float(best_score)))
-            lines.append(f"{pos_label} | {name_html} | {sel_score_int} | {best_role} | {best_score_int}")
+            line = f"{pos_label} | {name_html} | {sel_score_int} | {best_role} | {best_score_int}"
         else:
-            lines.append(f"{pos_label} |  |  |  | ")
+            line = f"{pos_label}"
+
+        lines.append(line)
+
+        # Insert blank line for readability at key positions
+        if pos_label in group_breaks:
+            lines.append("")
+
+    # Add totals at the bottom
+    lines.append("")
+    lines.append(f"Team total score = {int(round(team_total))} | Team average score = {int(round(team_avg))}")
 
     return "\n".join(lines), team_total
-
 
 first_lines, first_total = render_xi(first_choice)
 
@@ -472,6 +490,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
