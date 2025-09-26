@@ -506,7 +506,7 @@ info_text = (
 
 # First Starting XI
 st.markdown("**🛈 First Starting XI**")
-st.info(info_text)  # small hoverable info box below
+st.checkbox("", value=False, help=info_text, key="hover_first", label_visibility="collapsed")
 
 st.markdown(first_lines, unsafe_allow_html=True)
 
@@ -514,13 +514,14 @@ st.markdown("---")
 
 # Second Starting XI
 st.markdown("**🛈 Second Starting XI**")
-st.info(info_text)
+st.checkbox("", value=False, help=info_text, key="hover_second", label_visibility="collapsed")
 
 st.markdown(second_lines, unsafe_allow_html=True)
 
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
