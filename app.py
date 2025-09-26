@@ -406,61 +406,63 @@ first_choice = choose_starting_xi(all_player_indices)
 
 # compute display for a chosen XI
 def render_xi(chosen_map):
-    rows = {}
+    rows = []
     sel_scores = []
 
-    # Build dict keyed by position label
+    # Collect player data row by row
     for pos_idx, (pos_label, role_key) in enumerate(positions):
         if pos_idx in chosen_map:
             p_idx = int(chosen_map[pos_idx])
             name = str(player_names[p_idx]) if p_idx is not None else ""
             sel_score = float(score_matrix[p_idx, pos_idx]) if p_idx is not None else 0.0
             best_role, best_score = player_best_role[p_idx] if p_idx is not None else ("", 0.0)
-            rows[pos_label] = (name, sel_score, best_role, best_score, p_idx)
+            rows.append((pos_label, name, sel_score, best_role, best_score, p_idx))
             sel_scores.append(sel_score)
         else:
-            rows[pos_label] = ("", 0.0, "", 0.0, None)
+            rows.append((pos_label, "", 0.0, "", 0.0, None))
 
-    # Totals
-    team_total = float(sum(sel_scores))
-    team_avg = float(np.mean(sel_scores)) if sel_scores else 0.0
+    # Totals and averages
+    team_total = float(sum([r[2] for r in rows if r[5] is not None]))
+    placed_scores = [r[2] for r in rows if r[5] is not None]
+    team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
 
-    # --- Color fade: -400 = red, 0 = white, +400 = green ---
+    # --- Color scaling: red (-400), white (0), green (+400) ---
     def color_for_diff(diff):
         cap = 400.0
-        ratio = diff / cap
+        ratio = diff / cap  # -1.0 to +1.0
         ratio = max(-1.0, min(1.0, ratio))
+
         if ratio < 0:
-            # fade red
+            # interpolate from white (255,255,255) to red (255,0,0)
             r, g, b = 255, int(255 * (1 + ratio)), int(255 * (1 + ratio))
         else:
-            # fade green
+            # interpolate from white (255,255,255) to green (0,255,0)
             r, g, b = int(255 * (1 - ratio)), 255, int(255 * (1 - ratio))
+
         return f"rgb({r},{g},{b})"
 
-    # Helper: format one line
-    def fmt_line(pos_label):
-        name, sel_score, best_role, best_score, p_idx = rows.get(pos_label, ("", 0.0, "", 0.0, None))
+    # Format lines, grouped with blank lines
+    lines = []
+    group_breaks = {"GK", "", "RB", "CB1", "CB2", "LB", "", "DM1", "DM2", "", "AMR", "AMC", "AML", "", "ST"}  # after these, insert blank line
+
+    for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
             diff = sel_score - team_avg
             color = color_for_diff(diff)
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
-            return f"{pos_label} | {name_html} | {int(round(sel_score))} | {best_role} | {int(round(best_score))}"
+            sel_score_int = int(round(float(sel_score)))
+            best_score_int = int(round(float(best_score)))
+            line = f"{pos_label} | {name_html} | {sel_score_int} | {best_role} | {best_score_int}"
         else:
-            return pos_label
+            line = f"{pos_label}"
 
-    # Exact ordering with empty lines
-    order = [
-        "GK", "",
-        "RB", "CB1", "CB2", "LB", "",
-        "DM1", "DM2", "",
-        "AMR", "AMC", "AML", "",
-        "ST"
-    ]
+        lines.append(line)
 
-    lines = [fmt_line(pos) if pos else "" for pos in order]
+        # Insert blank line for readability at key positions
+        if pos_label in group_breaks:
+            lines.append("")
 
-    # Totals
+    # Add totals at the bottom
     lines.append("")
     lines.append(f"Team total score = {int(round(team_total))} | Team average score = {int(round(team_avg))}")
 
@@ -488,6 +490,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
