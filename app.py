@@ -298,7 +298,7 @@ ranked = df_out_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 cols_to_show = [c for c in ["Rank", "Name_display", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 st.subheader(f"Top players for role: {role} (sorted by Score)")
-st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]].head(200))
+st.dataframe(ranked[cols_to_show + [c for c in available_attrs if c in ranked.columns]]
 
 # compact per-role top-10
 st.markdown("---")
@@ -309,16 +309,14 @@ for i in range(0, len(ROLE_OPTIONS), cols_per_row):
     for j, r in enumerate(ROLE_OPTIONS[i:i+cols_per_row]):
         with cols[j]:
             rw = WEIGHTS_BY_ROLE.get(r, {})
-            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-            sc = attrs_norm.values.dot(w.values.astype(float))
-            tmp = df_out.copy()
-            tmp["Score"] = sc
-            tmp_sorted = tmp.sort_values("Score", ascending=False).reset_index(drop=True).head(10)
-            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
-            tiny = tmp_sorted[[c for c in ["Rank", "Name_display", "Age", "Transfer Value", "Score"] if c in tmp_sorted.columns]].copy()
-            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-            st.markdown(f"**{r}**")
-            st.table(tiny)
+            if not hasattr(rw, "get"):
+                try:
+                    rw = dict(rw)
+                except Exception:
+                    rw = {}
+            w = pd.Series([float(rw.get(a, 0.0)) for a in available_attrs],
+                          index=available_attrs).reindex(available_attrs).fillna(0.0)
+
 
 # ----------------- Starting XI assignment --------------------------------
 st.markdown("---")
@@ -460,5 +458,6 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
 
