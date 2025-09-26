@@ -427,12 +427,19 @@ def render_xi(chosen_map):
     team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
 
     # --- Color scaling: red (-400), white (0), green (+400) ---
-    def color_for_diff(diff, normalize=False, max_val=20.0):
-        # Determine cap
-        cap = 400.0
+    def color_for_diff(diff, normalize=False, max_val=20.0, current_max_score=400.0):
+        """
+        diff: sel_score - team_avg
+        normalize: whether attributes were normalized
+        max_val: max attribute value (used if normalized)
+        current_max_score: original ±400 range for unnormalized
+        """
+        # Adjust cap based on normalization
+        cap = current_max_score
         if normalize:
-            # Max possible score roughly sum(weights) * (attr / max_val)
-            cap = max_val * 10  # tweak based on your weights sum
+            # scale normalized diff to match original 400 range
+            cap = current_max_score  # still ±400, diff scaled up by max_val
+            diff = diff * (current_max_score / max_val)  # scale to same visual range
 
         # Clamp diff to [-cap, cap]
         diff = max(-cap, min(cap, diff))
@@ -504,6 +511,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
