@@ -308,12 +308,21 @@ df_out["Score"] = current_scores
 # --- Deduplicate players by Name (keep the row with the highest Score; tie-break by Transfer Value) ---
 # Ensure we have a consistent comparison key for names (strip, collapse spaces, lowercase, remove accents)
 def _normalize_name_for_key(s):
-    s = "" if pd.isna(s) else str(s)
+    if pd.isna(s):
+        return ""
+    s = str(s)
+
+    # replace ALL kinds of unicode whitespace with a normal space
+    s = re.sub(r"\s+", " ", s, flags=re.UNICODE)
     s = s.strip()
-    s = re.sub(r"\s+", " ", s)  # collapse multiple spaces
-    # normalize accents/diacritics (NFKD) then remove non-ascii combining marks
+
+    # normalize accents/diacritics (NFKD) then strip combining marks
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.category(ch).startswith("M"))
+
+    # also remove zero-width characters and non-breaking spaces
+    s = s.replace("\u200b", "").replace("\u200c", "").replace("\u00A0", " ")
+
     return s.lower()
 
 # create a stable name key column used only for deduplication
@@ -656,6 +665,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
