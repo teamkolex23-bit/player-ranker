@@ -226,28 +226,34 @@ st.markdown(
     ''',
     unsafe_allow_html=True
 )
-
-# Now the uploader appears below the tips
 file_label = "Upload your players HTML file"
-uploaded = st.file_uploader(file_label, type=["html"])
+uploaded_files = st.file_uploader(file_label, type=["html", "htm"], accept_multiple_files=True)
 
-if not uploaded:
+if not uploaded_files:
     st.stop()
 
-raw = uploaded.read()
-try:
-    html_text = raw.decode('utf-8', errors='ignore')
-except Exception:
-    html_text = raw.decode('latin-1', errors='ignore')
+# Process each uploaded file
+dfs = []
+for uploaded in uploaded_files:
+    raw = uploaded.read()
+    try:
+        html_text = raw.decode('utf-8', errors='ignore')
+    except Exception:
+        html_text = raw.decode('latin-1', errors='ignore')
 
-df, err = parse_players_from_html(html_text)
-if df is None:
-    st.error(f"Parsing failed: {err}")
-    st.stop()
+    df, err = parse_players_from_html(html_text)
+    if df is None:
+        st.error(f"Parsing failed for {uploaded.name}: {err}")
+        continue
 
-# merge duplicate columns and reset index for simple indexing
-df = merge_duplicate_columns(df)
-df = df.reset_index(drop=True)
+    # merge duplicate columns and reset index
+    df = merge_duplicate_columns(df)
+    df = df.reset_index(drop=True)
+
+    dfs.append(df)
+
+# Combine all files into one DataFrame
+df = pd.concat(dfs, ignore_index=True)
 
 # determine available attributes present in the upload
 available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
@@ -534,6 +540,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
