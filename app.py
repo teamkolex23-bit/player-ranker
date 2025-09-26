@@ -403,7 +403,6 @@ def choose_starting_xi(available_player_indices):
 # first XI
 all_player_indices = list(range(n_players))
 first_choice = choose_starting_xi(all_player_indices)
-first_choice = {int(k): int(v) for k, v in first_choice.items()}
 
 # compute display for a chosen XI
 def render_xi(chosen_map):
@@ -459,7 +458,6 @@ first_lines, first_total = render_xi(first_choice)
 used_player_indices = set(first_choice.values())
 remaining_players = [i for i in all_player_indices if i not in used_player_indices]
 second_choice = choose_starting_xi(remaining_players)
-second_choice = {int(k): int(v) for k, v in second_choice.items()}
 # if returned indices refer to available_player_indices ordering, ensure mapping uses those original indices
 # our function already maps to original indices when using scipy; when using greedy it also returns original indices.
 second_lines, second_total = render_xi(second_choice)
@@ -476,6 +474,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
