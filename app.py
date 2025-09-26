@@ -229,7 +229,7 @@ st.markdown(
 
 # Now the uploader appears below the tips
 file_label = "Upload your players HTML file"
-uploaded = st.file_uploader(file_label, type=["html","htm"])
+uploaded = st.file_uploader(file_label, type=["html"])
 
 if not uploaded:
     st.stop()
@@ -534,6 +534,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
