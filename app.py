@@ -456,16 +456,7 @@ def render_xi(chosen_map):
     for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
             diff = sel_score - team_avg
-            # normalized-aware color
-            ratio = max(-1.0, min(1.0, diff / cap))
-            if ratio > 0:
-                g = int(255 * ratio)
-                color = f"rgb(0,{g},0)"
-            elif ratio < 0:
-                r = int(255 * abs(ratio))
-                color = f"rgb({r},0,0)"
-            else:
-                color = "rgb(255,255,255)"
+            color = color_for_diff(diff, normalize=normalize, max_val=max_val)
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
             sel_score_int = int(round(float(sel_score)))
             best_score_int = int(round(float(best_score)))
@@ -507,6 +498,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
