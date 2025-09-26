@@ -251,7 +251,7 @@ norm_help = (
     "turning raw attribute scores into a 0..1 range so weights act proportionally. "
     "If your attributes use a different top value (e.g. 10), change the assumed max to rescale attributes."
 )
-normalize = st.("Normalize attribute values (divide by max)", value=False, help=norm_help)
+normalize = st.checkbox("Normalize attribute values (divide by max)", value=False, help=norm_help)
 max_val = 20.0
 if normalize:
     max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
@@ -522,4 +522,5 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
