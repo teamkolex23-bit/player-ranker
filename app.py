@@ -300,6 +300,9 @@ for i in range(0, len(ROLE_OPTIONS), cols_per_row):
             w = pd.Series([float(rw.get(a, 0.0)) for a in available_attrs],
                           index=available_attrs).reindex(available_attrs).fillna(0.0)
 
+# Format lines, grouped with blank lines 
+lines = [] 
+group_breaks = {"GK", "LB", "DM2", "AML"} # after these, insert blank line
 
 # ----------------- Starting XI assignment --------------------------------
 st.markdown("---")
@@ -453,6 +456,7 @@ except Exception:
     pass
 
 st.info("App loaded — if you want weight changes, attribute mapping adjustments, or different tie-break rules tell me which and I can update the file.")
+
 
 
 
