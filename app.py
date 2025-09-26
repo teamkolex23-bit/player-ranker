@@ -504,20 +504,18 @@ info_text = (
     "therefore this is the second best position instead with their second best rating."
 )
 
-# First Starting XI
-st.subheader("First Starting XI")
-st.button("🛈", key="first_xi_info", help=info_text, disabled=True, use_container_width=False)
+# Display as bold text with hover tooltip exactly like norm_help
+st.checkbox("First Starting XI", value=False, help=info_text, disabled=True)
 st.markdown(first_lines, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# Second Starting XI
-st.subheader("Second Starting XI")
-st.button("🛈", key="second_xi_info", help=info_text, disabled=True, use_container_width=False)
+st.checkbox("Second Starting XI", value=False, help=info_text, disabled=True)
 st.markdown(second_lines, unsafe_allow_html=True)
 
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
