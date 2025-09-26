@@ -216,9 +216,30 @@ uploader_help = (
 )
 file_label = "Upload your players HTML file"
 uploaded = st.file_uploader(file_label, type=["html","htm"], help=uploader_help)
-# small hoverable hint for drag-and-drop (rendered as HTML)
+
+# small hoverable hint for drag-and-drop, positioned immediately below uploader
 st.markdown(
-    '<div style="font-size:12px"> <span title="Maximum of 260 players can be loaded so limit your search in FM to narrow it down. I personally segment it into age groups and personality/media handling style but you can also block certain regions or divisions, like only having top 5 from the 2nd division up etc">🛈 Drag & drop tips</span></div>',
+    '''
+    <div style="font-size:12px; margin-top:4px;">
+        <span title="Maximum of 260 players can be loaded so limit your search in FM to narrow it down. 
+        I personally segment it into age groups and personality/media handling style but you can also block certain regions or divisions, 
+        like only having top 5 from the 2nd division up etc">
+        🛈 Drag & drop tips
+        </span>
+    </div>
+    ''',
+    unsafe_allow_html=True
+)
+
+# fmarena link with hover info, icon in front of text
+st.markdown(
+    '''
+    <div style="font-size:12px; margin-top:2px;">
+        <span title="Go to https://fmarenacalc.com and follow instructions">
+        🛈 FM Arena instructions
+        </span>
+    </div>
+    ''',
     unsafe_allow_html=True
 )
 if not uploaded:
@@ -524,6 +545,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
