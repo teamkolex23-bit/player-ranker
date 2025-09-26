@@ -500,24 +500,15 @@ second_choice = choose_starting_xi(remaining_players)
 second_lines, second_total = render_xi(second_choice)
 
 # First Starting XI
-st.markdown(
-    f'<div style="font-size:20px; font-weight:bold">🛈 <span title="Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating.">First Starting XI</span></div>',
-    unsafe_allow_html=True
-)
-st.markdown(first_lines, unsafe_allow_html=True)
-
-st.markdown("---")
+st.markdown( '<div style="font-size:12px"> <span title="Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating.">🛈 First Starting XI</span></div>', unsafe_allow_html=True )
 
 # Second Starting XI
-st.markdown(
-    f'<div style="font-size:20px; font-weight:bold">🛈 <span title="Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating.">Second Starting XI</span></div>',
-    unsafe_allow_html=True
-)
-st.markdown(second_lines, unsafe_allow_html=True)
+st.markdown( '<div style="font-size:12px"> <span title="Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating.">🛈 Second Starting XI</span></div>', unsafe_allow_html=True )
 
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
