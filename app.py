@@ -408,22 +408,17 @@ first_choice = choose_starting_xi(all_player_indices)
 def render_xi(chosen_map):
     rows = []
     sel_scores = []
-
     for pos_idx, (pos_label, role_key) in enumerate(positions):
         if pos_idx in chosen_map:
-            # defensive coercions
-            p_idx = int(chosen_map[pos_idx])
-            name = str(player_names[p_idx])
-            sel_score = float(score_matrix[p_idx, pos_idx])
-            best_role, best_score = player_best_role[p_idx]
-            best_score = float(best_score)
-
+            p_idx = chosen_map[pos_idx]
+            name = str(player_names[p_idx]) if p_idx is not None else ""
+            sel_score = float(score_matrix[p_idx, pos_idx]) if p_idx is not None else 0.0
+            best_role, best_score = player_best_role[p_idx] if p_idx is not None else ("", 0.0)
             rows.append((pos_label, name, sel_score, best_role, best_score, p_idx))
             sel_scores.append(sel_score)
         else:
             rows.append((pos_label, "", 0.0, "", 0.0, None))
 
-    # team totals and average (defensive for empty)
     team_total = float(sum([r[2] for r in rows if r[5] is not None]))
     placed_scores = [r[2] for r in rows if r[5] is not None]
     team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
@@ -445,12 +440,15 @@ def render_xi(chosen_map):
         if name:
             diff = sel_score - team_avg
             color = color_for_diff(diff)
-            # outer string uses double quotes, inner HTML uses single quotes — no escaping needed
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
-            lines.append(f"{pos_label} | {name_html} | {int(round(float(sel_score)))} | {best_role} | {int(round(float(best_score)))}")
+            sel_score_int = int(round(float(sel_score)))
+            best_score_int = int(round(float(best_score)))
+            lines.append(f"{pos_label} | {name_html} | {sel_score_int} | {best_role} | {best_score_int}")
         else:
             lines.append(f"{pos_label} |  |  |  | ")
-            return "\n".join(lines), team_total
+
+    return "\n".join(lines), team_total
+
 
 first_lines, first_total = render_xi(first_choice)
 
@@ -474,6 +472,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
