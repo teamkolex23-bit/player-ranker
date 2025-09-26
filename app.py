@@ -210,9 +210,6 @@ def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
                 merged[col] = subset.apply(lambda r: next((v for v in r if isinstance(v, str) and v.strip()), ""), axis=1)
     return merged
 
-# Page title
-st.title("FM24 Player Ranker")
-
 # Hoverable tips right below the title
 st.markdown(
     '''
@@ -539,6 +536,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
