@@ -504,21 +504,20 @@ info_text = (
     "therefore this is the second best position instead with their second best rating."
 )
 
-st.markdown(
-    f"## First Starting XI <span title='{info_text}'></span>",
-    unsafe_allow_html=True
-)
+# First Starting XI
+st.subheader("First Starting XI")
+st.button("🛈", key="first_xi_info", help=info_text, disabled=True, use_container_width=False)
 st.markdown(first_lines, unsafe_allow_html=True)
 
 st.markdown("---")
 
-st.markdown(
-    f"## Second Starting XI <span title='{info_text}'></span>",
-    unsafe_allow_html=True
-)
+# Second Starting XI
+st.subheader("Second Starting XI")
+st.button("🛈", key="second_xi_info", help=info_text, disabled=True, use_container_width=False)
 st.markdown(second_lines, unsafe_allow_html=True)
 
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
