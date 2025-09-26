@@ -251,7 +251,7 @@ norm_help = (
     "turning raw attribute scores into a 0..1 range so weights act proportionally. "
     "If your attributes use a different top value (e.g. 10), change the assumed max to rescale attributes."
 )
-normalize = st.checkbox("Normalize attribute values (divide by max) 🛈", value=True, help=norm_help)
+normalize = st.checkbox("Normalize attribute values (divide by max) 🛈", value=False, help=norm_help)
 max_val = 20.0
 if normalize:
     max_val = st.number_input("Assumed max attribute value (e.g. 20)", value=20.0, min_value=1.0)
@@ -427,19 +427,27 @@ def render_xi(chosen_map):
     team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
 
     # --- Color scaling: red (-400), white (0), green (+400) ---
-    def color_for_diff(diff):
+    def color_for_diff(diff, normalize=False, max_val=20.0):
+        # Determine cap dynamically
+        # If normalized, assume max possible score is roughly sum(weights)
+        # If not normalized, keep original ±400
         cap = 400.0
-        ratio = diff / cap  # -1.0 to +1.0
-        ratio = max(-1.0, min(1.0, ratio))
+        if normalize:
+            cap = max_val * 10  # tweak 10 if your weights sum differently
 
-        if ratio < 0:
-            # interpolate from white (255,255,255) to red (255,0,0)
-            r, g, b = 255, int(255 * (1 + ratio)), int(255 * (1 + ratio))
+        ratio = max(-1.0, min(1.0, diff / cap))
+
+        if ratio > 0:
+            g = int(255 * ratio)  # green increases toward +cap
+            r = 255 - g
+            return f"rgb({r},{g},0)"
+        elif ratio < 0:
+            r = int(255 * abs(ratio))  # red increases toward -cap
+            g = 255 - r
+            return f"rgb({r},{g},0)"
         else:
-            # interpolate from white (255,255,255) to green (0,255,0)
-            r, g, b = int(255 * (1 - ratio)), 255, int(255 * (1 - ratio))
+            return "rgb(255,255,255)"  # white for zero diff
 
-        return f"rgb({r},{g},{b})"
 
     # Format lines, grouped with blank lines
     lines = []
@@ -448,7 +456,16 @@ def render_xi(chosen_map):
     for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
         if name:
             diff = sel_score - team_avg
-            color = color_for_diff(diff)
+            # normalized-aware color
+            ratio = max(-1.0, min(1.0, diff / cap))
+            if ratio > 0:
+                g = int(255 * ratio)
+                color = f"rgb(0,{g},0)"
+            elif ratio < 0:
+                r = int(255 * abs(ratio))
+                color = f"rgb({r},0,0)"
+            else:
+                color = "rgb(255,255,255)"
             name_html = f"<span style='color:{color}; font-weight:600'>{name}</span>"
             sel_score_int = int(round(float(sel_score)))
             best_score_int = int(round(float(best_score)))
@@ -490,6 +507,7 @@ st.markdown(f"**Team total score = {int(round(second_total))}**")
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
