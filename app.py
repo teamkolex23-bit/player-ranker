@@ -501,18 +501,31 @@ second_lines, second_total = render_xi(second_choice)
 
 second_lines, second_total = render_xi(second_choice)
 
-# First Starting XI — bold, large, hoverable text
+# Info text
+hover_text = "Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating."
+
+# First Starting XI with hover info
 st.markdown(
-    "<span style='font-weight:bold; font-size:20px;' title=\"Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating.\">First Starting XI</span>",
+    f"""
+    <div style="font-weight:bold; font-size:20px;">
+        First Starting XI
+        <span style="font-weight:bold; font-size:20px; cursor: help; color:black; text-decoration:none; display:inline-block;" title="{hover_text}">[?]</span>
+    </div>
+    """,
     unsafe_allow_html=True
 )
 st.markdown(first_lines, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# Second Starting XI — bold, large, hoverable text
+# Second Starting XI with hover info
 st.markdown(
-    "<span style='font-weight:bold; font-size:20px;' title=\"Everybody's best role is ST since it's the easiest position to get rating in, therefore this is the second best position instead with their second best rating.\">Second Starting XI</span>",
+    f"""
+    <div style="font-weight:bold; font-size:20px;">
+        Second Starting XI
+        <span style="font-weight:bold; font-size:20px; cursor: help; color:black; text-decoration:none; display:inline-block;" title="{hover_text}">[?]</span>
+    </div>
+    """,
     unsafe_allow_html=True
 )
 st.markdown(second_lines, unsafe_allow_html=True)
