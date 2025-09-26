@@ -1,6 +1,6 @@
-streamlit
-pandas
-numpy
-beautifulsoup4
-scipy
-pyarrow
+streamlit>=1.20
+pandas>=1.5
+numpy>=1.24
+beautifulsoup4>=4.11
+scipy>=1.9
+pyarrow>=9.0
