@@ -329,7 +329,7 @@ df_out["_TransferValueNum"] = df_out.get("Transfer Value", "").apply(parse_trans
 df_out = df_out.sort_values(by=["Score", "_TransferValueNum"], ascending=[False, False])
 
 # drop duplicate Name+Position, keeping the first (highest score, then highest transfer value)
-df_out = df_out.drop_duplicates(subset=["Name", "Position"], keep="first").reset_index(drop=True)
+df_out = df_out.drop_duplicates(subset=["Name"], keep="first").reset_index(drop=True)
 
 # cleanup helper column
 df_out = df_out.drop(columns=["_TransferValueNum"], errors="ignore")
@@ -634,6 +634,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
