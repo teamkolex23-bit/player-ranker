@@ -182,17 +182,6 @@ def parse_players_from_html(html_text: str):
     
     df = pd.DataFrame(rows)
     
-    # normalize player names to avoid duplicates caused by whitespace/case issues
-    df["Name"] = (
-        df["Name"]
-        .astype(str)
-        .str.strip()  # remove leading/trailing spaces
-        .str.replace(r"\s+", " ", regex=True)  # collapse multiple spaces
-        .str.lower()  # make lowercase for comparison
-    )
-    
-    df = df.drop_duplicates(ignore_index=True)
-    
     # convert numeric-like columns except textual ones
     for c in df.columns:
         if c in ("Name", "Position", "Transfer Value", "Inf"):
@@ -667,6 +656,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
