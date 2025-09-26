@@ -303,8 +303,6 @@ for i in range(0, len(roles), per_row):
 
 # Starting XI selection (optimal assignment per formation)
 st.markdown("---")
-st.subheader("Best Starting XIs")
-
 # formation mapping: position label -> role key
 positions = [
     ("GK", "GK"),
@@ -516,6 +514,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
