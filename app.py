@@ -570,53 +570,35 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown("## ⚽ Role Analysis Overview")
 
-# Create tabs for better organization
-tab1, tab2 = st.tabs(["📊 Top 10 by Role", "📈 Score Distribution"])
+# Role analysis without tabs
+available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
+attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
+attrs_norm_final = attrs_df_final
 
-with tab1:
-    available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
-    attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
-    attrs_norm_final = attrs_df_final
+roles_per_row = 4
+for i in range(0, len(ROLE_OPTIONS), roles_per_row):
+    cols = st.columns(roles_per_row)
+    for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
+        with cols[j]:
+            st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
 
-    roles_per_row = 4
-    for i in range(0, len(ROLE_OPTIONS), roles_per_row):
-        cols = st.columns(roles_per_row)
-        for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
-            with cols[j]:
-                st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
+            rw = WEIGHTS_BY_ROLE.get(r, {})
+            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
+            sc = attrs_norm_final.values.dot(w.values.astype(float))
 
-                rw = WEIGHTS_BY_ROLE.get(r, {})
-                w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
-                sc = attrs_norm_final.values.dot(w.values.astype(float))
+            tmp = df_final.copy()
+            tmp["Score"] = sc
+            tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
+            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
 
-                tmp = df_final.copy()
-                tmp["Score"] = sc
-                tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
-                tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
+            display_cols = ["Rank", "Name", "Score"]
+            if "Age" in tmp_sorted.columns:
+                display_cols.insert(-1, "Age")
 
-                display_cols = ["Rank", "Name", "Score"]
-                if "Age" in tmp_sorted.columns:
-                    display_cols.insert(-1, "Age")
+            tiny = tmp_sorted[display_cols].copy()
+            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
 
-                tiny = tmp_sorted[display_cols].copy()
-                tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-
-                st.dataframe(tiny, hide_index=True, use_container_width=True)
-
-with tab2:
-    st.markdown("### Score Distribution Analysis")
-    score_stats = df_sorted['Score'].describe()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Minimum Score", f"{score_stats['min']:.0f}")
-        st.metric("25th Percentile", f"{score_stats['25%']:.0f}")
-        st.metric("Median Score", f"{score_stats['50%']:.0f}")
-
-    with col2:
-        st.metric("75th Percentile", f"{score_stats['75%']:.0f}")
-        st.metric("Maximum Score", f"{score_stats['max']:.0f}")
-        st.metric("Standard Deviation", f"{score_stats['std']:.0f}")
+            st.dataframe(tiny, hide_index=True, use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -785,9 +767,9 @@ def render_xi(chosen_map, team_name="Team"):
             name_color = f"rgb({red}, {green}, {blue})"
             
             lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-                <span style='font-weight: bold; min-width: 5rem;'>{pos_label}</span>
+                <span style='font-weight: bold; min-width: 5rem; color: {name_color};'>{pos_label}</span>
                 <span style='font-weight: bold; flex-grow: 1; text-align: center; color: {name_color};'>{name}</span>
-                <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
+                <span style='min-width: 4rem; text-align: right; color: {name_color};'>{sel_score_int} pts</span>
             </div>""")
 
     lines.append(f"""<div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
@@ -816,6 +798,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
