@@ -633,128 +633,31 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Formation Builder
-st.markdown("### ⚙️ Formation Builder")
-st.markdown("**Instructions:** Select roles for each line. Use 'EMPTY' to create spacing between formation lines.")
+# Fixed Formation Setup
+st.markdown("### ⚙️ Team Formation (4-2-3-1)")
+st.markdown("Using a fixed 4-2-3-1 formation with optimal spacing for team display.")
 
-# Initialize session state for formation
-if 'formation_lines' not in st.session_state:
-    st.session_state.formation_lines = [
-        ("GK", "GK"),
-        ("EMPTY", "EMPTY"),
-        ("RB", "DL/DR"),
-        ("CB", "CB"),
-        ("CB", "CB"),
-        ("LB", "DL/DR"),
-        ("EMPTY", "EMPTY"),
-        ("DM", "DM"),
-        ("DM", "DM"),
-        ("EMPTY", "EMPTY"),
-        ("AMR", "AML/AMR"),
-        ("AMC", "AMC"),
-        ("AML", "AML/AMR"),
-        ("EMPTY", "EMPTY"),
-        ("ST", "ST")
-    ]
-
-# Role options including EMPTY for spacing
-all_role_options = ["EMPTY"] + [r for r in ROLE_OPTIONS]
-
-# Display formation builder
-st.markdown("**Current Formation:**")
-
-# Create columns for the formation display and controls
-col_formation, col_controls = st.columns([2, 1])
-
-with col_formation:
-    # Display current formation visually
-    for i, (label, role) in enumerate(st.session_state.formation_lines):
-        if role == "EMPTY":
-            st.markdown(f"**Line {i+1}:** `[EMPTY SPACE]`")
-        else:
-            st.markdown(f"**Line {i+1}:** {label} ({role})")
-
-with col_controls:
-    st.markdown("**Edit Formation:**")
-    
-    # Add line button
-    if st.button("➕ Add Line"):
-        st.session_state.formation_lines.append(("NEW", "DL/DR"))
-        st.rerun()
-    
-    # Remove last line button (but keep at least GK)
-    if st.button("➖ Remove Last Line") and len(st.session_state.formation_lines) > 1:
-        st.session_state.formation_lines.pop()
-        st.rerun()
-    
-    # Reset to default button
-    if st.button("🔄 Reset to Default"):
-        st.session_state.formation_lines = [
-            ("GK", "GK"),
-            ("EMPTY", "EMPTY"),
-            ("RB", "DL/DR"),
-            ("CB", "CB"),
-            ("CB", "CB"),
-            ("LB", "DL/DR"),
-            ("EMPTY", "EMPTY"),
-            ("DM", "DM"),
-            ("DM", "DM"),
-            ("EMPTY", "EMPTY"),
-            ("AMR", "AML/AMR"),
-            ("AMC", "AMC"),
-            ("AML", "AML/AMR"),
-            ("EMPTY", "EMPTY"),
-            ("ST", "ST")
-        ]
-        st.rerun()
-
-# Edit individual lines
-st.markdown("**Edit Individual Lines:**")
-for i in range(len(st.session_state.formation_lines)):
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col1:
-        st.write(f"Line {i+1}:")
-    
-    with col2:
-        current_label, current_role = st.session_state.formation_lines[i]
-        
-        # Role selector
-        current_role_index = all_role_options.index(current_role) if current_role in all_role_options else 0
-        new_role = st.selectbox(
-            f"Role",
-            all_role_options,
-            index=current_role_index,
-            key=f"role_{i}",
-            label_visibility="collapsed"
-        )
-        
-        # Auto-generate label based on role
-        if new_role == "EMPTY":
-            new_label = "EMPTY"
-        elif new_role == "GK":
-            new_label = "GK"
-        elif new_role in ["DL/DR", "WBL/WBR"]:
-            # Count how many we have to alternate between LB/RB
-            count = sum(1 for _, r in st.session_state.formation_lines[:i] if r in ["DL/DR", "WBL/WBR"])
-            new_label = "RB" if count % 2 == 0 else "LB"
-        elif new_role in ["AML/AMR", "ML/MR"]:
-            # Count how many we have to alternate between AML/AMR
-            count = sum(1 for _, r in st.session_state.formation_lines[:i] if r in ["AML/AMR", "ML/MR"])
-            new_label = "AMR" if count % 2 == 0 else "AML"
-        else:
-            new_label = new_role
-        
-        # Update the formation line
-        st.session_state.formation_lines[i] = (new_label, new_role)
-    
-    with col3:
-        if st.button("🗑️", key=f"delete_{i}") and len(st.session_state.formation_lines) > 1:
-            st.session_state.formation_lines.pop(i)
-            st.rerun()
+# Fixed formation lines with your desired layout
+formation_lines = [
+    ("GK", "GK"),
+    ("EMPTY", "EMPTY"),
+    ("RB", "DL/DR"),
+    ("CB", "CB"),
+    ("CB", "CB"),
+    ("LB", "DL/DR"),
+    ("EMPTY", "EMPTY"),
+    ("DM", "DM"),
+    ("DM", "DM"),
+    ("EMPTY", "EMPTY"),
+    ("AMR", "AML/AMR"),
+    ("AMC", "AMC"),
+    ("AML", "AML/AMR"),
+    ("EMPTY", "EMPTY"),
+    ("ST", "ST")
+]
 
 # Filter out EMPTY positions for the actual team selection
-positions = [(label, role) for label, role in st.session_state.formation_lines if role != "EMPTY"]
+positions = [(label, role) for label, role in formation_lines if role != "EMPTY"]
 
 n_players = len(df_final)
 n_positions = len(positions)
@@ -818,8 +721,27 @@ def render_xi(chosen_map, team_name="Team"):
     rows = []
     position_index = 0
     
+    # Fixed formation lines
+    formation_lines = [
+        ("GK", "GK"),
+        ("EMPTY", "EMPTY"),
+        ("RB", "DL/DR"),
+        ("CB", "CB"),
+        ("CB", "CB"),
+        ("LB", "DL/DR"),
+        ("EMPTY", "EMPTY"),
+        ("DM", "DM"),
+        ("DM", "DM"),
+        ("EMPTY", "EMPTY"),
+        ("AMR", "AML/AMR"),
+        ("AMC", "AMC"),
+        ("AML", "AML/AMR"),
+        ("EMPTY", "EMPTY"),
+        ("ST", "ST")
+    ]
+    
     # Build rows including empty spaces for visual formatting
-    for line_label, line_role in st.session_state.formation_lines:
+    for line_label, line_role in formation_lines:
         if line_role == "EMPTY":
             rows.append(("EMPTY", "---", 0.0, "EMPTY"))
         else:
@@ -857,7 +779,6 @@ def render_xi(chosen_map, team_name="Team"):
     lines.append("</div>")
 
     return "".join(lines)
-
 # Generate both teams
 all_player_indices = list(range(n_players))
 first_choice = choose_starting_xi(all_player_indices, score_matrix)
@@ -878,5 +799,6 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
