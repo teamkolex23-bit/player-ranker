@@ -502,6 +502,13 @@ ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 # Enhanced dataframe display
 cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 
+# Add search functionality
+st.dataframe(
+    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
+    use_container_width=True,
+    height=400
+)
+
 # Compact Role Analysis
 st.markdown("## Top 10 in each position")
 
@@ -540,7 +547,7 @@ for i in range(0, len(ROLE_OPTIONS), roles_per_row):
 st.markdown("""
 <div class="info-box">
     <strong>Formation Analysis:</strong><br>
-    Hungarian algorithm used to determine what the starting 11, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should theoretically be true as long as their hidden attributes aren't terrible.
+    Hungarian algorithm used to create the best starting 11, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should theoretically be true as long as their hidden attributes aren't terrible.
 </div>
 """, unsafe_allow_html=True)
 
@@ -726,6 +733,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
