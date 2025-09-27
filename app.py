@@ -717,7 +717,6 @@ def choose_starting_xi(available_player_indices, current_score_matrix):
         chosen = {c: avail[r] for r, c in zip(row_ind, col_ind)}
         return chosen
 
-
 def render_xi(chosen_map, team_name="Team"):
     rows = []
     for pos_idx, (pos_label, role_key) in enumerate(positions):
@@ -739,19 +738,15 @@ def render_xi(chosen_map, team_name="Team"):
 
     for pos_label, name, sel_score, role_key in rows:
         sel_score_int = int(round(sel_score))
-        lines.append(f"""
-        <div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+        lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
             <span style='font-weight: bold; min-width: 5rem;'>{role_key}</span>
             <span style='font-weight: bold; flex-grow: 1; text-align: center;'>{name}</span>
             <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
-        </div>
-        """)
+        </div>""")
 
-    lines.append(f"""
-    <div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
+    lines.append(f"""<div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
         <strong>Team Total: {int(round(team_total))} | Average: {int(round(team_avg))}</strong>
-    </div>
-    """)
+    </div>""")
     lines.append("</div>")
 
     return "".join(lines)
@@ -776,3 +771,4 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
