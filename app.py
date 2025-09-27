@@ -459,26 +459,6 @@ if not dfs:
     st.error("❌ No valid player data parsed from any uploaded file.")
     st.stop()
 
-# Process files and show summary
-dfs = []
-file_results = []
-for uploaded in uploaded_files:
-    raw = uploaded.read()
-    try:
-        html_text = raw.decode('utf-8', errors='ignore')
-    except Exception:
-        html_text = raw.decode('latin-1', errors='ignore')
-
-    df, err = parse_players_from_html(html_text)
-    if df is None:
-        file_results.append(f"❌ {uploaded.name}: Failed to read")
-        continue
-
-    df = merge_duplicate_columns(df)
-    df = df.reset_index(drop=True)
-    dfs.append(df)
-    file_results.append(f"✅ {uploaded.name}: {len(df)} players loaded")
-
 # Show results
 for result in file_results:
     st.write(result)
@@ -755,6 +735,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
