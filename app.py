@@ -493,47 +493,6 @@ df['Score'] = scores
 df_final = deduplicate_players(df)
 df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
 
-# Dashboard Overview
-st.markdown("## 📊 Analysis Dashboard")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <h3 class="blue" style="margin: 0;">👥 Total Players</h3>
-        <h2 style="margin: 0.5rem 0;">{len(df_final)}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    top_score = df_sorted['Score'].max()
-    st.markdown(f"""
-    <div class="metric-card">
-        <h3 class="green" style="margin: 0;">🏆 Top Score</h3>
-        <h2 style="margin: 0.5rem 0;">{top_score:.0f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    avg_score = df_sorted['Score'].mean()
-    st.markdown(f"""
-    <div class="metric-card">
-        <h3 class="purple" style="margin: 0;">📈 Average Score</h3>
-        <h2 style="margin: 0.5rem 0;">{avg_score:.0f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col4:
-    unique_positions = df_final['Position'].nunique() if 'Position' in df_final.columns else 0
-    st.markdown(f"""
-    <div class="metric-card">
-        <h3 class="orange" style="margin: 0;">⚽ Positions</h3>
-        <h2 style="margin: 0.5rem 0;">{unique_positions}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-
 # Main Rankings with enhanced display
 st.markdown(f"## 🏆 Top Players for {role}")
 
@@ -785,6 +744,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
