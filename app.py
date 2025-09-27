@@ -392,15 +392,6 @@ def deduplicate_players(df):
 
 # Sidebar Configuration
 with st.sidebar:
-    # Role selection
-    ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-    role = st.selectbox(
-        "Choose Position to display score for",
-        ROLE_OPTIONS,
-        index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
-        help="Not necessary since I also include a top 10 for every position"
-    )
-
     # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
@@ -494,27 +485,21 @@ for role_key in WEIGHTS_BY_ROLE.keys():
     scores = attrs_norm.values.dot(weights.values.astype(float))
     df_with_scores[f'Score_{role_key}'] = scores
 
-# Calculate scores and deduplicate
-attrs_df = df[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df
+# Deduplicate players
+df_final = deduplicate_players(df_with_scores)
 
-selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+# Main Rankings with enhanced display - showing scores for ALL positions
+st.markdown("## All players score as a")
 
-scores = attrs_norm.values.dot(weights.values.astype(float))
-df['Score'] = scores
-
-df_final = deduplicate_players(df)
-df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
-
-# Main Rankings with enhanced display
-st.markdown(f"## All players score as a {role}")
-
-ranked = df_sorted.copy()
+ranked = df_final.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 
 # Enhanced dataframe display
-cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
+cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value"] if c in ranked.columns]
+
+# Add all score columns to the display
+score_columns = [f'Score_{role_key}' for role_key in WEIGHTS_BY_ROLE.keys()]
+cols_to_show.extend(score_columns)
 
 display_df = ranked
 
@@ -523,40 +508,6 @@ st.dataframe(
     use_container_width=True,
     height=400
 )
-
-# Compact Role Analysis
-st.markdown("## Top 10 in each position")
-
-# Role analysis without tabs
-available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
-attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
-attrs_norm_final = attrs_df_final
-
-roles_per_row = 4
-for i in range(0, len(ROLE_OPTIONS), roles_per_row):
-    cols = st.columns(roles_per_row)
-    for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
-        with cols[j]:
-            st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
-
-            rw = WEIGHTS_BY_ROLE.get(r, {})
-            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
-            sc = attrs_norm_final.values.dot(w.values.astype(float))
-
-            tmp = df_final.copy()
-            tmp["Score"] = sc
-            tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
-            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
-
-            display_cols = ["Rank", "Name", "Score"]
-            if "Age" in tmp_sorted.columns:
-                display_cols.insert(-1, "Age")
-
-            tiny = tmp_sorted[display_cols].copy()
-            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-
-            st.dataframe(tiny, hide_index=True, use_container_width=True)
-
 
 # Starting XI Section
 st.markdown("""
