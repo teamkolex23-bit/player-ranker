@@ -633,31 +633,128 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Formation Builder
+st.markdown("### ⚙️ Formation Builder")
+st.markdown("**Instructions:** Select roles for each line. Use 'EMPTY' to create spacing between formation lines.")
 
-# NEW: Customizable Formation Setup
-st.markdown("### ⚙️ Customize Your Formation")
-cols = st.columns(5)
-outfield_positions_selected = []
-outfield_role_options = [r for r in ROLE_OPTIONS if r != "GK"]
-# Default to a 4-2-3-1 wide formation
-default_formation = ["DL/DR", "CB", "CB", "DL/DR", "DM", "CM", "AML/AMR", "AMC", "AML/AMR", "ST"]
+# Initialize session state for formation
+if 'formation_lines' not in st.session_state:
+    st.session_state.formation_lines = [
+        ("GK", "GK"),
+        ("EMPTY", "EMPTY"),
+        ("RB", "DL/DR"),
+        ("CB", "CB"),
+        ("CB", "CB"),
+        ("LB", "DL/DR"),
+        ("EMPTY", "EMPTY"),
+        ("DM", "DM"),
+        ("DM", "DM"),
+        ("EMPTY", "EMPTY"),
+        ("AMR", "AML/AMR"),
+        ("AMC", "AMC"),
+        ("AML", "AML/AMR"),
+        ("EMPTY", "EMPTY"),
+        ("ST", "ST")
+    ]
 
-for i in range(10):
-    with cols[i % 5]:
-        key = f"pos_{i+1}"
-        default_index = outfield_role_options.index(default_formation[i]) if default_formation[i] in outfield_role_options else 0
-        selected_role = st.selectbox(
-            f"Player {i+2}",
-            outfield_role_options,
-            index=default_index,
-            key=key
+# Role options including EMPTY for spacing
+all_role_options = ["EMPTY"] + [r for r in ROLE_OPTIONS]
+
+# Display formation builder
+st.markdown("**Current Formation:**")
+
+# Create columns for the formation display and controls
+col_formation, col_controls = st.columns([2, 1])
+
+with col_formation:
+    # Display current formation visually
+    for i, (label, role) in enumerate(st.session_state.formation_lines):
+        if role == "EMPTY":
+            st.markdown(f"**Line {i+1}:** `[EMPTY SPACE]`")
+        else:
+            st.markdown(f"**Line {i+1}:** {label} ({role})")
+
+with col_controls:
+    st.markdown("**Edit Formation:**")
+    
+    # Add line button
+    if st.button("➕ Add Line"):
+        st.session_state.formation_lines.append(("NEW", "DL/DR"))
+        st.rerun()
+    
+    # Remove last line button (but keep at least GK)
+    if st.button("➖ Remove Last Line") and len(st.session_state.formation_lines) > 1:
+        st.session_state.formation_lines.pop()
+        st.rerun()
+    
+    # Reset to default button
+    if st.button("🔄 Reset to Default"):
+        st.session_state.formation_lines = [
+            ("GK", "GK"),
+            ("EMPTY", "EMPTY"),
+            ("RB", "DL/DR"),
+            ("CB", "CB"),
+            ("CB", "CB"),
+            ("LB", "DL/DR"),
+            ("EMPTY", "EMPTY"),
+            ("DM", "DM"),
+            ("DM", "DM"),
+            ("EMPTY", "EMPTY"),
+            ("AMR", "AML/AMR"),
+            ("AMC", "AMC"),
+            ("AML", "AML/AMR"),
+            ("EMPTY", "EMPTY"),
+            ("ST", "ST")
+        ]
+        st.rerun()
+
+# Edit individual lines
+st.markdown("**Edit Individual Lines:**")
+for i in range(len(st.session_state.formation_lines)):
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col1:
+        st.write(f"Line {i+1}:")
+    
+    with col2:
+        current_label, current_role = st.session_state.formation_lines[i]
+        
+        # Role selector
+        current_role_index = all_role_options.index(current_role) if current_role in all_role_options else 0
+        new_role = st.selectbox(
+            f"Role",
+            all_role_options,
+            index=current_role_index,
+            key=f"role_{i}",
+            label_visibility="collapsed"
         )
-        # Use a generic label like P2, P3... for the position label
-        outfield_positions_selected.append((f"P{i+2}", selected_role))
+        
+        # Auto-generate label based on role
+        if new_role == "EMPTY":
+            new_label = "EMPTY"
+        elif new_role == "GK":
+            new_label = "GK"
+        elif new_role in ["DL/DR", "WBL/WBR"]:
+            # Count how many we have to alternate between LB/RB
+            count = sum(1 for _, r in st.session_state.formation_lines[:i] if r in ["DL/DR", "WBL/WBR"])
+            new_label = "RB" if count % 2 == 0 else "LB"
+        elif new_role in ["AML/AMR", "ML/MR"]:
+            # Count how many we have to alternate between AML/AMR
+            count = sum(1 for _, r in st.session_state.formation_lines[:i] if r in ["AML/AMR", "ML/MR"])
+            new_label = "AMR" if count % 2 == 0 else "AML"
+        else:
+            new_label = new_role
+        
+        # Update the formation line
+        st.session_state.formation_lines[i] = (new_label, new_role)
+    
+    with col3:
+        if st.button("🗑️", key=f"delete_{i}") and len(st.session_state.formation_lines) > 1:
+            st.session_state.formation_lines.pop(i)
+            st.rerun()
 
-# The final positions list is now dynamic
-positions = [("GK", "GK")] + outfield_positions_selected
-
+# Filter out EMPTY positions for the actual team selection
+positions = [(label, role) for label, role in st.session_state.formation_lines if role != "EMPTY"]
 
 n_players = len(df_final)
 n_positions = len(positions)
@@ -719,17 +816,24 @@ def choose_starting_xi(available_player_indices, current_score_matrix):
 
 def render_xi(chosen_map, team_name="Team"):
     rows = []
-    for pos_idx, (pos_label, role_key) in enumerate(positions):
-        if pos_idx in chosen_map:
-            p_idx = chosen_map[pos_idx]
-            name = player_names[p_idx]
-            sel_score = score_matrix[p_idx, pos_idx]
-            rows.append((pos_label, name, sel_score, role_key))
+    position_index = 0
+    
+    # Build rows including empty spaces for visual formatting
+    for line_label, line_role in st.session_state.formation_lines:
+        if line_role == "EMPTY":
+            rows.append(("EMPTY", "---", 0.0, "EMPTY"))
         else:
-            rows.append((pos_label, "---", 0.0, role_key))
+            if position_index in chosen_map:
+                p_idx = chosen_map[position_index]
+                name = player_names[p_idx]
+                sel_score = score_matrix[p_idx, position_index]
+                rows.append((line_label, name, sel_score, line_role))
+            else:
+                rows.append((line_label, "---", 0.0, line_role))
+            position_index += 1
 
-    team_total = sum(r[2] for r in rows if r[1] != "---")
-    placed_scores = [r[2] for r in rows if r[1] != "---"]
+    team_total = sum(r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY")
+    placed_scores = [r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY"]
     team_avg = np.mean(placed_scores) if placed_scores else 0.0
 
     # Format as table
@@ -737,12 +841,15 @@ def render_xi(chosen_map, team_name="Team"):
     lines.append(f"<h3 style='text-align: center; margin-bottom: 1rem;'>{team_name}</h3>")
 
     for pos_label, name, sel_score, role_key in rows:
-        sel_score_int = int(round(sel_score))
-        lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-            <span style='font-weight: bold; min-width: 5rem;'>{role_key}</span>
-            <span style='font-weight: bold; flex-grow: 1; text-align: center;'>{name}</span>
-            <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
-        </div>""")
+        if role_key == "EMPTY":
+            lines.append("<div style='height: 20px;'></div>")  # Empty space
+        else:
+            sel_score_int = int(round(sel_score))
+            lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+                <span style='font-weight: bold; min-width: 5rem;'>{pos_label}</span>
+                <span style='font-weight: bold; flex-grow: 1; text-align: center;'>{name}</span>
+                <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
+            </div>""")
 
     lines.append(f"""<div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
         <strong>Team Total: {int(round(team_total))} | Average: {int(round(team_avg))}</strong>
@@ -771,4 +878,5 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
