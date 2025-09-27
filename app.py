@@ -395,14 +395,14 @@ with st.sidebar:
     # Role selection
     ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
     role = st.selectbox(
-        "🎯 Choose Role to Analyze",
+        "Choose Role to Analyze",
         ROLE_OPTIONS,
         index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
         help="Select the position you want to rank players for"
     )
 
     # Analysis info
-    st.markdown("### 📈 Analysis Info")
+    st.markdown("### Analysis Info")
     st.info("""
     **Role Weights**: From FMScout (still accurate in FM24 unlike the one from FM-Arena)
 
@@ -413,7 +413,7 @@ with st.sidebar:
 
 st.markdown("""
 <div class="info-box">
-    <strong>📋 Upload Instructions:</strong><br>
+    <strong>Upload Instructions:</strong><br>
     • Go to <a href="https://fmarenacalc.com" target="_blank">fmarenacalc.com</a> for HTML export guide<br>
     • Maximum 260 players can be exported per html file, so make sure to narrow your search before each print screen<br>
     • Multiple files can be uploaded simultaneously<br>
@@ -422,7 +422,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 uploaded_files = st.file_uploader(
-    "Upload the HTML files you print screened from FM24",
+    "Follow the 'Upload Instructions:' above and upload the HTML files you print screened from FM24 here below",
     type=["html", "htm"],
     accept_multiple_files=True
 )
@@ -728,6 +728,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
