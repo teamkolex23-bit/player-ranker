@@ -8,19 +8,15 @@ import unicodedata
 
 # Page config with custom styling
 st.set_page_config(
-    layout="wide",
+    layout="wide", 
     page_title="FM24 Player Ranker",
     page_icon="⚽",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling and a dark theme focus
+# Custom CSS for better styling
 st.markdown("""
 <style>
-    /* Base styles for dark theme */
-    body {
-        color: #fafafa;
-    }
     .main-header {
         background: linear-gradient(90deg, #1f4e79, #2e8b57);
         padding: 2rem;
@@ -35,38 +31,35 @@ st.markdown("""
         font-size: 2.5rem;
         font-weight: bold;
     }
-    /* Updated card styles for dark theme */
     .section-card {
-        background: #1f2c38; /* Darker background */
+        background: white;
         padding: 1.5rem;
         border-radius: 10px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         margin-bottom: 1.5rem;
         border-left: 4px solid #1f4e79;
-        color: #fafafa; /* Light text */
+        color: #333333;
+    }
+    .section-card h2, .section-card h3 {
+        color: #1f4e79 !important;
+    }
+    .section-card p, .section-card div {
+        color: #333333 !important;
     }
     .info-box {
-        background: #1a3a5a; /* Darker info box */
+        background: #f0f8ff;
         padding: 1rem;
         border-radius: 8px;
         border-left: 4px solid #4169e1;
         margin-bottom: 1rem;
-        color: #fafafa;
     }
     .metric-card {
-        background: #1f2c38; /* Darker metric card */
+        background: #f8f9fa;
         padding: 1rem;
         border-radius: 8px;
         text-align: center;
-        border: 2px solid #3c4b5a;
-        color: #fafafa;
+        border: 2px solid #e9ecef;
     }
-    /* Brighter header colors for metric cards */
-    .metric-card h3.blue { color: #66b2ff; }
-    .metric-card h3.green { color: #76ff7a; }
-    .metric-card h3.purple { color: #c792ea; }
-    .metric-card h3.orange { color: #ffcb6b; }
-
     .role-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -77,7 +70,7 @@ st.markdown("""
     }
     .xi-formation {
         background: #1a5d1a;
-        background-image:
+        background-image: 
             linear-gradient(90deg, rgba(255,255,255,0.1) 50%, transparent 50%),
             linear-gradient(rgba(255,255,255,0.1) 50%, transparent 50%);
         background-size: 20px 20px;
@@ -94,7 +87,7 @@ st.markdown("""
         border-radius: 10px;
         padding: 2rem;
         text-align: center;
-        background: #1f2c38;
+        background: #fafafa;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -248,60 +241,60 @@ def parse_players_from_html(html_text: str):
     table = soup.find("table")
     if table is None:
         return None, "No <table> found in HTML."
-
+    
     header_row = table.find("tr")
     if header_row is None:
         return None, "No rows in table."
-
+    
     ths = header_row.find_all(["th", "td"])
     header_cells = [th.get_text(strip=True) for th in ths]
     canonical = [ABBR_MAP.get(h, h) for h in header_cells]
-
+    
     rows = []
     for tr in table.find_all("tr")[1:]:
         cols = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
         if not cols or all(not c for c in cols):
             continue
-
+        
         if len(cols) < len(canonical):
             cols += [""] * (len(canonical) - len(cols))
         cols = cols[:len(canonical)]
-
+        
         row = {col_name: val for col_name, val in zip(canonical, cols) if col_name}
-
+        
         name = (row.get("Name") or "").strip()
         if not name or name.lower() == "name":
             continue
-
+        
         rows.append(row)
-
+    
     if not rows:
         return None, "No data rows parsed from HTML table."
-
+    
     df = pd.DataFrame(rows)
-
+    
     # convert numeric-like columns except textual ones
     for c in df.columns:
         if c in ("Name", "Position", "Transfer Value", "Inf"):
             continue
         df[c] = df[c].astype(str).str.extract(r'(-?\d+(?:\.\d+)?)')[0]
         df[c] = pd.to_numeric(df[c], errors="coerce")
-
+    
     if "Age" in df.columns:
         df["Age"] = pd.to_numeric(df["Age"], errors="coerce").astype("Int64")
-
+    
     return df, None
 
 def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
     cols = list(df.columns)
     if not any(cols.count(c) > 1 for c in cols):
         return df
-
+    
     unique_order = []
     for c in cols:
         if c not in unique_order:
             unique_order.append(c)
-
+    
     merged = pd.DataFrame(index=df.index)
     for col in unique_order:
         same_cols = [c for c in cols if c == col]
@@ -314,7 +307,7 @@ def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
                 merged[col] = subset_num.mean(axis=1)
             else:
                 merged[col] = subset.apply(lambda r: next((v for v in r if isinstance(v, str) and v.strip()), ""), axis=1)
-
+    
     return merged
 
 def parse_transfer_value(x):
@@ -363,56 +356,87 @@ def create_name_key(name):
     """Create name key for deduplication"""
     if pd.isna(name) or not name:
         return f"_empty_{id(name)}"
-
+    
     name_str = str(name).strip()
     if not name_str:
         return f"_empty_{id(name)}"
-
+    
     normalized = re.sub(r'\s+', ' ', name_str.lower().strip())
     normalized = normalized.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
     normalized = normalized.replace('ñ', 'n').replace('ç', 'c')
-
+    
     return normalized
 
 def deduplicate_players(df):
     """Deduplicate players by name, keeping best version"""
     if len(df) <= 1:
         return df
-
+    
     df = df.copy()
     df['_name_key'] = df['Name'].apply(create_name_key)
     df['_transfer_val_numeric'] = df.get('Transfer Value', '').apply(parse_transfer_value)
-
+    
     df_sorted = df.sort_values(['Score', '_transfer_val_numeric'], ascending=[False, False])
     df_deduped = df_sorted.drop_duplicates(subset=['_name_key'], keep='first')
     df_deduped = df_deduped.drop(columns=['_name_key', '_transfer_val_numeric'])
-
+    
     duplicates_removed = len(df) - len(df_deduped)
     if duplicates_removed > 0:
         st.success(f"✅ Removed {duplicates_removed} duplicate player(s)")
-
+    
     return df_deduped.reset_index(drop=True)
+
+def format_score_with_color(score, percentile_ranks):
+    """Color code scores based on percentile ranking"""
+    if score >= percentile_ranks[90]:
+        return f'<span style="color: #28a745; font-weight: bold;">{score:.0f}</span>'  # Green - Top 10%
+    elif score >= percentile_ranks[75]:
+        return f'<span style="color: #fd7e14; font-weight: bold;">{score:.0f}</span>'  # Orange - Top 25%
+    elif score >= percentile_ranks[50]:
+        return f'<span style="color: #6f42c1;">{score:.0f}</span>'  # Purple - Top 50%
+    elif score >= percentile_ranks[25]:
+        return f'<span style="color: #6c757d;">{score:.0f}</span>'  # Gray - Bottom 50%
+    else:
+        return f'<span style="color: #dc3545;">{score:.0f}</span>'  # Red - Bottom 25%
 
 # Sidebar Configuration
 with st.sidebar:
     st.markdown("### ⚙️ Configuration")
-
+    
     # Role selection
     ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
     role = st.selectbox(
-        "🎯 Choose Role to Analyze",
-        ROLE_OPTIONS,
+        "🎯 Choose Role to Analyze", 
+        ROLE_OPTIONS, 
         index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
         help="Select the position you want to rank players for"
     )
-
+    
+    # Normalization settings
+    st.markdown("### 📊 Attribute Normalization")
+    normalize = st.checkbox(
+        "Normalize attribute values", 
+        value=False,
+        help="Divides attribute values by max to create 0-1 scale"
+    )
+    
+    if normalize:
+        max_val = st.number_input(
+            "Max attribute value", 
+            value=20.0, 
+            min_value=1.0,
+            help="What's the maximum possible value for attributes in your data?"
+        )
+    else:
+        max_val = 20.0
+    
     # Analysis info
     st.markdown("### 📈 Analysis Info")
     st.info("""
     **Role Weights**: Each position uses different attribute weightings based on tactical importance.
-
+    
     **Scoring**: Higher scores indicate better fit for the selected role.
-
+    
     **Deduplication**: Keeps the best version when duplicate names are found.
     """)
 
@@ -432,7 +456,7 @@ st.markdown("""
 
 uploaded_files = st.file_uploader(
     "Select your FM24 player HTML files",
-    type=["html", "htm"],
+    type=["html", "htm"], 
     accept_multiple_files=True,
     help="Upload the HTML files exported from Football Manager 2024"
 )
@@ -453,20 +477,20 @@ dfs = []
 for i, uploaded in enumerate(uploaded_files):
     status_text.text(f'Processing {uploaded.name}...')
     progress_bar.progress((i + 1) / len(uploaded_files))
-
+    
     raw = uploaded.read()
     try:
         html_text = raw.decode('utf-8', errors='ignore')
     except Exception:
         html_text = raw.decode('latin-1', errors='ignore')
-
+    
     df, err = parse_players_from_html(html_text)
     if df is None:
         st.error(f"❌ Parsing failed for {uploaded.name}: {err}")
         continue
-
+    
     st.success(f"✅ Loaded {len(df)} players from {uploaded.name}")
-
+    
     df = merge_duplicate_columns(df)
     df = df.reset_index(drop=True)
     dfs.append(df)
@@ -488,7 +512,7 @@ if not available_attrs:
 
 # Calculate scores and deduplicate
 attrs_df = df[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df
+attrs_norm = attrs_df / float(max_val) if normalize else attrs_df
 
 selected_weights = WEIGHTS_BY_ROLE.get(role, {})
 weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
@@ -508,7 +532,7 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.markdown(f"""
     <div class="metric-card">
-        <h3 class="blue" style="margin: 0;">👥 Total Players</h3>
+        <h3 style="color: #1f4e79; margin: 0;">👥 Total Players</h3>
         <h2 style="margin: 0.5rem 0;">{len(df_final)}</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -517,7 +541,7 @@ with col2:
     top_score = df_sorted['Score'].max()
     st.markdown(f"""
     <div class="metric-card">
-        <h3 class="green" style="margin: 0;">🏆 Top Score</h3>
+        <h3 style="color: #28a745; margin: 0;">🏆 Top Score</h3>
         <h2 style="margin: 0.5rem 0;">{top_score:.0f}</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -526,7 +550,7 @@ with col3:
     avg_score = df_sorted['Score'].mean()
     st.markdown(f"""
     <div class="metric-card">
-        <h3 class="purple" style="margin: 0;">📈 Average Score</h3>
+        <h3 style="color: #6f42c1; margin: 0;">📈 Average Score</h3>
         <h2 style="margin: 0.5rem 0;">{avg_score:.0f}</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -535,7 +559,7 @@ with col4:
     unique_positions = df_final['Position'].nunique() if 'Position' in df_final.columns else 0
     st.markdown(f"""
     <div class="metric-card">
-        <h3 class="orange" style="margin: 0;">⚽ Positions</h3>
+        <h3 style="color: #fd7e14; margin: 0;">⚽ Positions</h3>
         <h2 style="margin: 0.5rem 0;">{unique_positions}</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -549,6 +573,10 @@ st.markdown(f"## 🏆 Top Players for {role}")
 ranked = df_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 
+# Calculate percentile ranks for color coding
+percentile_ranks = df_sorted['Score'].quantile([0.25, 0.5, 0.75, 0.9]).to_dict()
+percentile_ranks = {int(k*100): v for k, v in percentile_ranks.items()}
+
 # Enhanced dataframe display
 cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 
@@ -561,7 +589,7 @@ else:
     display_df = ranked
 
 st.dataframe(
-    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
+    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]], 
     use_container_width=True,
     height=400
 )
@@ -578,7 +606,7 @@ tab1, tab2 = st.tabs(["📊 Top 10 by Role", "📈 Score Distribution"])
 with tab1:
     available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
     attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
-    attrs_norm_final = attrs_df_final
+    attrs_norm_final = attrs_df_final / float(max_val) if normalize else attrs_df_final
 
     roles_per_row = 4
     for i in range(0, len(ROLE_OPTIONS), roles_per_row):
@@ -586,35 +614,35 @@ with tab1:
         for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
             with cols[j]:
                 st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
-
+                
                 rw = WEIGHTS_BY_ROLE.get(r, {})
                 w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
                 sc = attrs_norm_final.values.dot(w.values.astype(float))
-
+                
                 tmp = df_final.copy()
                 tmp["Score"] = sc
                 tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
                 tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
-
+                
                 display_cols = ["Rank", "Name", "Score"]
                 if "Age" in tmp_sorted.columns:
                     display_cols.insert(-1, "Age")
-
+                
                 tiny = tmp_sorted[display_cols].copy()
                 tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-
+                
                 st.dataframe(tiny, hide_index=True, use_container_width=True)
 
 with tab2:
     st.markdown("### Score Distribution Analysis")
     score_stats = df_sorted['Score'].describe()
-
+    
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Minimum Score", f"{score_stats['min']:.0f}")
         st.metric("25th Percentile", f"{score_stats['25%']:.0f}")
         st.metric("Median Score", f"{score_stats['50%']:.0f}")
-
+    
     with col2:
         st.metric("75th Percentile", f"{score_stats['75%']:.0f}")
         st.metric("Maximum Score", f"{score_stats['max']:.0f}")
@@ -629,35 +657,25 @@ st.markdown("## ⚽ Starting XI Generator")
 st.markdown("""
 <div class="info-box">
     <strong>🎯 Formation Analysis:</strong><br>
-    Select your 10 outfield positions below. The app uses the Hungarian algorithm for optimal player-position assignment based on role compatibility scores to maximize overall team strength.
+    Uses Hungarian algorithm for optimal player-position assignment based on role compatibility scores.
+    Players are assigned to maximize overall team strength while avoiding duplicates.
 </div>
 """, unsafe_allow_html=True)
 
-
-# NEW: Customizable Formation Setup
-st.markdown("### ⚙️ Customize Your Formation")
-cols = st.columns(5)
-outfield_positions_selected = []
-outfield_role_options = [r for r in ROLE_OPTIONS if r != "GK"]
-# Default to a 4-2-3-1 wide formation
-default_formation = ["DL/DR", "CB", "CB", "DL/DR", "DM", "CM", "AML/AMR", "AMC", "AML/AMR", "ST"]
-
-for i in range(10):
-    with cols[i % 5]:
-        key = f"pos_{i+1}"
-        default_index = outfield_role_options.index(default_formation[i]) if default_formation[i] in outfield_role_options else 0
-        selected_role = st.selectbox(
-            f"Player {i+2}",
-            outfield_role_options,
-            index=default_index,
-            key=key
-        )
-        # Use a generic label like P2, P3... for the position label
-        outfield_positions_selected.append((f"P{i+2}", selected_role))
-
-# The final positions list is now dynamic
-positions = [("GK", "GK")] + outfield_positions_selected
-
+# Formation setup
+positions = [
+    ("GK", "GK"),
+    ("RB", "DL/DR"),
+    ("CB1", "CB"),
+    ("CB2", "CB"),
+    ("LB", "DL/DR"),
+    ("DM1", "DM"),
+    ("DM2", "DM"),
+    ("AMR", "AML/AMR"),
+    ("AMC", "AMC"),
+    ("AML", "AML/AMR"),
+    ("ST", "ST"),
+]
 
 n_players = len(df_final)
 n_positions = len(positions)
@@ -666,9 +684,8 @@ player_names = df_final["Name"].astype(str).tolist()
 # Precompute role weight vectors
 role_weight_vectors = {}
 for _, role_key in positions:
-    if role_key not in role_weight_vectors: # Avoid re-computing for same role
-        rw = WEIGHTS_BY_ROLE.get(role_key, {})
-        role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs_final], dtype=float)
+    rw = WEIGHTS_BY_ROLE.get(role_key, {})
+    role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs_final], dtype=float)
 
 # Compute score matrix
 score_matrix = np.zeros((n_players, n_positions), dtype=float)
@@ -678,101 +695,203 @@ for i_idx in range(n_players):
         w = role_weight_vectors[role_key]
         score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
 
+# Find best non-ST role for each player
+all_role_keys = list(WEIGHTS_BY_ROLE.keys())
+all_role_vectors = {rk: np.array([float(WEIGHTS_BY_ROLE[rk].get(a, 0.0)) for a in available_attrs_final], dtype=float) for rk in all_role_keys}
+
+player_best_role = []
+for i_idx in range(n_players):
+    player_attr_vals = attrs_norm_final.iloc[i_idx].values if len(available_attrs_final) > 0 else np.zeros((len(available_attrs_final),), dtype=float)
+    best_score = -1e9
+    best_role = None
+    
+    for rk, vec in all_role_vectors.items():
+        if rk == "ST":
+            continue
+        sc = float(np.dot(player_attr_vals, vec))
+        if sc > best_score:
+            best_score = sc
+            best_role = rk
+    
+    player_best_role.append((best_role, best_score))
+
 # Hungarian algorithm assignment
 try:
     from scipy.optimize import linear_sum_assignment
 except Exception:
     linear_sum_assignment = None
 
-def choose_starting_xi(available_player_indices, current_score_matrix):
+def choose_starting_xi(available_player_indices):
     avail = list(available_player_indices)
-    num_avail = len(avail)
-    num_pos = current_score_matrix.shape[1]
-
-    if num_avail == 0 or num_pos == 0:
-        return {}
-
-    # Cost matrix for assignment
-    cost_matrix = -current_score_matrix[avail, :]
-
-    if linear_sum_assignment is None or num_avail < num_pos:
-        # Greedy fallback if scipy is missing or not enough players
+    m = max(len(avail), n_positions)
+    cost = np.zeros((m, n_positions), dtype=float)
+    
+    if len(avail) > 0:
+        cost[:len(avail), :] = -score_matrix[avail, :]
+    
+    if linear_sum_assignment is None:
+        # Greedy fallback
         chosen = {}
         used_players = set()
-        for p_idx in range(num_pos):
-            best_player_idx = -1
-            best_score = -1e9
+        
+        for p_idx in range(n_positions):
+            best_p = None
+            best_sc = -1e9
+            
             for i_idx in avail:
-                if i_idx not in used_players:
-                    score = current_score_matrix[i_idx, p_idx]
-                    if score > best_score:
-                        best_score = score
-                        best_player_idx = i_idx
-            if best_player_idx != -1:
-                chosen[p_idx] = best_player_idx
-                used_players.add(best_player_idx)
+                if i_idx in used_players:
+                    continue
+                sc = float(score_matrix[int(i_idx), p_idx])
+                if sc > best_sc:
+                    best_sc = sc
+                    best_p = int(i_idx)
+            
+            if best_p is not None:
+                chosen[p_idx] = int(best_p)
+                used_players.add(best_p)
+        
         return chosen
     else:
-        row_ind, col_ind = linear_sum_assignment(cost_matrix)
-        chosen = {c: avail[r] for r, c in zip(row_ind, col_ind)}
+        row_ind, col_ind = linear_sum_assignment(cost)
+        chosen = {}
+        
+        for r, c in zip(row_ind, col_ind):
+            if r < len(avail) and c < n_positions:
+                chosen[c] = int(avail[r])
+        
         return chosen
-
 
 def render_xi(chosen_map, team_name="Team"):
     rows = []
+    sel_scores = []
+    
     for pos_idx, (pos_label, role_key) in enumerate(positions):
         if pos_idx in chosen_map:
-            p_idx = chosen_map[pos_idx]
-            name = player_names[p_idx]
-            sel_score = score_matrix[p_idx, pos_idx]
-            rows.append((pos_label, name, sel_score, role_key))
+            p_idx = int(chosen_map[pos_idx])
+            name = str(player_names[p_idx]) if p_idx is not None else ""
+            sel_score = float(score_matrix[p_idx, pos_idx]) if p_idx is not None else 0.0
+            best_role, best_score = player_best_role[p_idx] if p_idx is not None else ("", 0.0)
+            rows.append((pos_label, name, sel_score, best_role, best_score, p_idx))
+            sel_scores.append(sel_score)
         else:
-            rows.append((pos_label, "---", 0.0, role_key))
-
-    team_total = sum(r[2] for r in rows if r[1] != "---")
-    placed_scores = [r[2] for r in rows if r[1] != "---"]
-    team_avg = np.mean(placed_scores) if placed_scores else 0.0
-
+            rows.append((pos_label, "", 0.0, "", 0.0, None))
+    
+    team_total = float(sum([r[2] for r in rows if r[5] is not None]))
+    placed_scores = [r[2] for r in rows if r[5] is not None]
+    team_avg = float(np.mean(placed_scores)) if placed_scores else 0.0
+    
+    def color_for_diff(diff, normalize_setting=False, max_val_setting=20.0, current_max_score=400.0):
+        cap = current_max_score
+        if normalize_setting:
+            diff = diff * (current_max_score / max_val_setting)
+        
+        diff = max(-cap, min(cap, diff))
+        
+        if diff > 0:
+            ratio = diff / cap
+            r = int(255 * (1 - ratio))
+            g = 255
+            b = int(255 * (1 - ratio))
+        elif diff < 0:
+            ratio = -diff / cap
+            r = 255
+            g = int(255 * (1 - ratio))
+            b = int(255 * (1 - ratio))
+        else:
+            r = g = b = 255
+        
+        return f"rgb({r},{g},{b})"
+    
     # Format as table
     lines = [f"<div class='xi-formation'>"]
     lines.append(f"<h3 style='text-align: center; margin-bottom: 1rem;'>{team_name}</h3>")
-
-    for pos_label, name, sel_score, role_key in rows:
-        sel_score_int = int(round(sel_score))
-        lines.append(f"""
-        <div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-            <span style='font-weight: bold; min-width: 5rem;'>{role_key}</span>
-            <span style='font-weight: bold; flex-grow: 1; text-align: center;'>{name}</span>
-            <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
-        </div>
-        """)
-
+    
+    group_breaks = {"GK": "🥅 GOALKEEPER", "LB": "🛡️ DEFENSE", "DM2": "⚙️ MIDFIELD", "AML": "⚡ ATTACK"}
+    
+    for pos_label, name, sel_score, best_role, best_score, p_idx in rows:
+        if pos_label in group_breaks:
+            lines.append(f"<div style='margin: 1rem 0; font-weight: bold; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 0.5rem;'>{group_breaks[pos_label]}</div>")
+        
+        if name:
+            diff = sel_score - team_avg
+            color = color_for_diff(diff, normalize, max_val)
+            sel_score_int = int(round(float(sel_score)))
+            best_score_int = int(round(float(best_score)))
+            
+            lines.append(f"""
+            <div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+                <span style='font-weight: bold; min-width: 3rem;'>{pos_label}</span>
+                <span style='color:{color}; font-weight: bold; flex-grow: 1; text-align: center;'>{name}</span>
+                <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
+            </div>
+            """)
+        else:
+            lines.append(f"<div style='padding: 0.5rem; opacity: 0.5;'>{pos_label}: No player assigned</div>")
+    
     lines.append(f"""
     <div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
         <strong>Team Total: {int(round(team_total))} | Average: {int(round(team_avg))}</strong>
     </div>
     """)
     lines.append("</div>")
-
-    return "".join(lines)
+    
+    return "".join(lines), team_total
 
 # Generate both teams
 all_player_indices = list(range(n_players))
-first_choice = choose_starting_xi(all_player_indices, score_matrix)
+first_choice = choose_starting_xi(all_player_indices)
 used_player_indices = set(first_choice.values())
 remaining_players = [i for i in all_player_indices if i not in used_player_indices]
-second_choice = choose_starting_xi(remaining_players, score_matrix)
+second_choice = choose_starting_xi(remaining_players)
 
-st.markdown("<br>", unsafe_allow_html=True)
 # Display both teams side by side
 col1, col2 = st.columns(2)
 
 with col1:
-    first_xi_html = render_xi(first_choice, "First XI")
-    st.markdown(first_xi_html, unsafe_allow_html=True)
+    first_lines, first_total = render_xi(first_choice, "First XI")
+    st.markdown(first_lines, unsafe_allow_html=True)
 
 with col2:
-    second_xi_html = render_xi(second_choice, "Second XI")
-    st.markdown(second_xi_html, unsafe_allow_html=True)
+    second_lines, second_total = render_xi(second_choice, "Second XI")
+    st.markdown(second_lines, unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Download Section
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.markdown("## 📥 Export Results")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    csv_bytes = df_sorted.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "📊 Download Full Rankings (CSV)",
+        csv_bytes,
+        file_name=f"players_ranked_{role}_{len(df_final)}_players.csv",
+        mime="text/csv"
+    )
+
+with col2:
+    # Create summary report
+    summary_data = {
+        'Analysis_Date': [pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')],
+        'Role_Analyzed': [role],
+        'Total_Players': [len(df_final)],
+        'Normalization_Used': [normalize],
+        'Max_Attribute_Value': [max_val],
+        'Top_Player': [df_sorted.iloc[0]['Name']],
+        'Top_Score': [df_sorted.iloc[0]['Score']],
+        'Average_Score': [df_sorted['Score'].mean()],
+    }
+    summary_df = pd.DataFrame(summary_data)
+    summary_csv = summary_df.to_csv(index=False).encode("utf-8")
+    
+    st.download_button(
+        "📋 Download Analysis Summary",
+        summary_csv,
+        file_name=f"analysis_summary_{role}.csv",
+        mime="text/csv"
+    )
 
 st.markdown('</div>', unsafe_allow_html=True)
