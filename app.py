@@ -485,10 +485,13 @@ for role_key in WEIGHTS_BY_ROLE.keys():
     scores = attrs_norm.values.dot(weights.values.astype(float))
     df_with_scores[f'Score_{role_key}'] = scores
 
-# Main Rankings with enhanced display
+# Deduplicate players
+df_final = deduplicate_players(df_with_scores)
+
+# Main Rankings with enhanced display - showing scores for ALL positions
 st.markdown("## All players score as a")
 
-ranked = df_with_scores.copy()
+ranked = df_final.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 
 # Enhanced dataframe display
@@ -539,13 +542,13 @@ formation_lines = [
 # Filter out EMPTY positions for the actual team selection
 positions = [(label, role) for label, role in formation_lines if role != "EMPTY"]
 
-n_players = len(df_with_scores)
+n_players = len(df_final)
 n_positions = len(positions)
-player_names = df_with_scores["Name"].astype(str).tolist()
+player_names = df_final["Name"].astype(str).tolist()
 
 # Available attributes for the final dataframe
-available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_with_scores.columns]
-attrs_df_final = df_with_scores[available_attrs_final].fillna(0).astype(float)
+available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
+attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
 attrs_norm_final = attrs_df_final
 
 # Precompute role weight vectors
