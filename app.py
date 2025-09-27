@@ -76,24 +76,42 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 .xi-formation {
-    background: linear-gradient(180deg, #2d5a2d 0%, #1a4d1a 50%, #2d5a2d 100%);
+    background: #228B22;
     background-image:
         /* Center circle */
-        radial-gradient(circle at 50% 50%, transparent 60px, rgba(255,255,255,0.3) 61px, rgba(255,255,255,0.3) 63px, transparent 64px),
-        /* Center line */
-        linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,0.4) calc(50% - 1px), rgba(255,255,255,0.4) calc(50% + 1px), transparent calc(50% + 1px)),
-        /* Penalty areas */
-        linear-gradient(180deg, transparent 20%, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.2) 21%, transparent 21%, transparent 79%, rgba(255,255,255,0.2) 79%, rgba(255,255,255,0.2) 80%, transparent 80%),
-        /* Side lines */
-        linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 2px, transparent 2px, transparent calc(100% - 2px), rgba(255,255,255,0.3) calc(100% - 2px), rgba(255,255,255,0.3) 100%),
-        /* Goal lines */
-        linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 2px, transparent 2px, transparent calc(100% - 2px), rgba(255,255,255,0.3) calc(100% - 2px), rgba(255,255,255,0.3) 100%);
+        radial-gradient(circle at 50% 50%, transparent 40px, rgba(255,255,255,0.4) 41px, rgba(255,255,255,0.4) 43px, transparent 44px),
+        /* Center line (horizontal) */
+        linear-gradient(0deg, transparent calc(50% - 1px), rgba(255,255,255,0.5) calc(50% - 1px), rgba(255,255,255,0.5) calc(50% + 1px), transparent calc(50% + 1px)),
+        /* Goal areas (top and bottom) */
+        linear-gradient(0deg, 
+            rgba(255,255,255,0.3) 0%, 
+            rgba(255,255,255,0.3) 2px, 
+            transparent 2px, 
+            transparent 15%, 
+            rgba(255,255,255,0.3) 15%, 
+            rgba(255,255,255,0.3) 17px, 
+            transparent 17px,
+            transparent 83px,
+            rgba(255,255,255,0.3) 83px,
+            rgba(255,255,255,0.3) 85%,
+            transparent 85%,
+            transparent calc(100% - 2px),
+            rgba(255,255,255,0.3) calc(100% - 2px),
+            rgba(255,255,255,0.3) 100%),
+        /* Side lines (left and right) */
+        linear-gradient(90deg, 
+            rgba(255,255,255,0.4) 0%, 
+            rgba(255,255,255,0.4) 2px, 
+            transparent 2px, 
+            transparent calc(100% - 2px), 
+            rgba(255,255,255,0.4) calc(100% - 2px), 
+            rgba(255,255,255,0.4) 100%);
     padding: 2rem;
     border-radius: 10px;
     color: white;
     font-family: monospace;
-    border: 3px solid rgba(255,255,255,0.4);
-    position: relative;
+    border: 3px solid rgba(255,255,255,0.5);
+    min-height: 500px;
 }
     .stProgress .st-bo {
         background-color: #e8f4fd;
@@ -808,6 +826,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
