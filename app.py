@@ -494,7 +494,7 @@ df_final = deduplicate_players(df)
 df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
 
 # Main Rankings with enhanced display
-st.markdown(f"## All players weighted as a {role}")
+st.markdown(f"## All players score as a {role}")
 
 ranked = df_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
@@ -734,6 +734,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
