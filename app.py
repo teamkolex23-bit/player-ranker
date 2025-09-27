@@ -76,102 +76,12 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 .xi-formation {
-    background: #228B22;
-    background-image:
-        /* Center circle */
-        radial-gradient(circle at 50% 50%, transparent 40px, rgba(255,255,255,0.4) 41px, rgba(255,255,255,0.4) 43px, transparent 44px),
-        /* Center line (horizontal) */
-        linear-gradient(0deg, transparent calc(50% - 1px), rgba(255,255,255,0.5) calc(50% - 1px), rgba(255,255,255,0.5) calc(50% + 1px), transparent calc(50% + 1px)),
-        /* Top penalty box */
-        linear-gradient(0deg, 
-            transparent 0%, 
-            rgba(255,255,255,0.4) 0%, 
-            rgba(255,255,255,0.4) 2px, 
-            transparent 2px, 
-            transparent 18%, 
-            rgba(255,255,255,0.4) 18%, 
-            rgba(255,255,255,0.4) calc(18% + 2px), 
-            transparent calc(18% + 2px),
-            transparent 100%),
-        linear-gradient(90deg, 
-            transparent 25%, 
-            rgba(255,255,255,0.4) 25%, 
-            rgba(255,255,255,0.4) calc(25% + 2px), 
-            transparent calc(25% + 2px),
-            transparent calc(75% - 2px),
-            rgba(255,255,255,0.4) calc(75% - 2px),
-            rgba(255,255,255,0.4) 75%,
-            transparent 75%) 0 0 / 100% 20%,
-        /* Bottom penalty box */
-        linear-gradient(0deg, 
-            transparent 0%,
-            transparent calc(82% - 2px),
-            rgba(255,255,255,0.4) calc(82% - 2px),
-            rgba(255,255,255,0.4) 82%,
-            transparent 82%,
-            transparent calc(100% - 2px),
-            rgba(255,255,255,0.4) calc(100% - 2px),
-            rgba(255,255,255,0.4) 100%),
-        linear-gradient(90deg, 
-            transparent 25%, 
-            rgba(255,255,255,0.4) 25%, 
-            rgba(255,255,255,0.4) calc(25% + 2px), 
-            transparent calc(25% + 2px),
-            transparent calc(75% - 2px),
-            rgba(255,255,255,0.4) calc(75% - 2px),
-            rgba(255,255,255,0.4) 75%,
-            transparent 75%) 0 80% / 100% 20%,
-        /* Top goal area */
-        linear-gradient(0deg, 
-            rgba(255,255,255,0.4) 0%, 
-            rgba(255,255,255,0.4) 2px, 
-            transparent 2px, 
-            transparent 8%, 
-            rgba(255,255,255,0.4) 8%, 
-            rgba(255,255,255,0.4) calc(8% + 2px), 
-            transparent calc(8% + 2px),
-            transparent 100%),
-        linear-gradient(90deg, 
-            transparent 40%, 
-            rgba(255,255,255,0.4) 40%, 
-            rgba(255,255,255,0.4) calc(40% + 2px), 
-            transparent calc(40% + 2px),
-            transparent calc(60% - 2px),
-            rgba(255,255,255,0.4) calc(60% - 2px),
-            rgba(255,255,255,0.4) 60%,
-            transparent 60%) 0 0 / 100% 10%,
-        /* Bottom goal area */
-        linear-gradient(0deg, 
-            transparent 0%,
-            transparent calc(92% - 2px),
-            rgba(255,255,255,0.4) calc(92% - 2px),
-            rgba(255,255,255,0.4) 92%,
-            transparent 92%,
-            transparent calc(100% - 2px),
-            rgba(255,255,255,0.4) calc(100% - 2px),
-            rgba(255,255,255,0.4) 100%),
-        linear-gradient(90deg, 
-            transparent 40%, 
-            rgba(255,255,255,0.4) 40%, 
-            rgba(255,255,255,0.4) calc(40% + 2px), 
-            transparent calc(40% + 2px),
-            transparent calc(60% - 2px),
-            rgba(255,255,255,0.4) calc(60% - 2px),
-            rgba(255,255,255,0.4) 60%,
-            transparent 60%) 0 90% / 100% 10%,
-        /* Side lines */
-        linear-gradient(90deg, 
-            rgba(255,255,255,0.4) 0%, 
-            rgba(255,255,255,0.4) 2px, 
-            transparent 2px, 
-            transparent calc(100% - 2px), 
-            rgba(255,255,255,0.4) calc(100% - 2px), 
-            rgba(255,255,255,0.4) 100%);
+    background: #1f2c38;
     padding: 2rem;
     border-radius: 10px;
     color: white;
     font-family: monospace;
-    border: 3px solid rgba(255,255,255,0.5);
+    border: 3px solid #3c4b5a;
     min-height: 500px;
 }
     .stProgress .st-bo {
@@ -850,16 +760,35 @@ def render_xi(chosen_map, team_name="Team"):
     lines = [f"<div class='xi-formation'>"]
     lines.append(f"<h3 style='text-align: center; margin-bottom: 1rem;'>{team_name}</h3>")
 
-    for pos_label, name, sel_score, role_key in rows:
-        if role_key == "EMPTY":
-            lines.append("<div style='height: 20px;'></div>")  # Empty space
-        else:
-            sel_score_int = int(round(sel_score))
-            lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-                <span style='font-weight: bold; min-width: 5rem;'>{pos_label}</span>
-                <span style='font-weight: bold; flex-grow: 1; text-align: center;'>{name}</span>
-                <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
-            </div>""")
+for pos_label, name, sel_score, role_key in rows:
+    if role_key == "EMPTY":
+        lines.append("<div style='height: 20px;'></div>")  # Empty space
+    else:
+        sel_score_int = int(round(sel_score))
+        
+        # Calculate color based on difference from team average
+        diff_from_avg = sel_score - team_avg
+        
+        # Normalize difference to a 0-1 scale (400 points = full intensity)
+        intensity = min(abs(diff_from_avg) / 400.0, 1.0)
+        
+        # Calculate RGB values
+        if diff_from_avg >= 0:  # Above average - green
+            red = int(255 * (1 - intensity))
+            green = 255
+            blue = int(255 * (1 - intensity))
+        else:  # Below average - red
+            red = 255
+            green = int(255 * (1 - intensity))
+            blue = int(255 * (1 - intensity))
+        
+        name_color = f"rgb({red}, {green}, {blue})"
+        
+        lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+            <span style='font-weight: bold; min-width: 5rem;'>{pos_label}</span>
+            <span style='font-weight: bold; flex-grow: 1; text-align: center; color: {name_color};'>{name}</span>
+            <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
+        </div>""")
 
     lines.append(f"""<div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
         <strong>Team Total: {int(round(team_total))} | Average: {int(round(team_avg))}</strong>
@@ -887,6 +816,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
