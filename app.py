@@ -75,17 +75,26 @@ st.markdown("""
         font-weight: bold;
         margin-bottom: 0.5rem;
     }
-    .xi-formation {
-        background: #1a5d1a;
-        background-image:
-            linear-gradient(90deg, rgba(255,255,255,0.1) 50%, transparent 50%),
-            linear-gradient(rgba(255,255,255,0.1) 50%, transparent 50%);
-        background-size: 20px 20px;
-        padding: 2rem;
-        border-radius: 10px;
-        color: white;
-        font-family: monospace;
-    }
+.xi-formation {
+    background: linear-gradient(180deg, #2d5a2d 0%, #1a4d1a 50%, #2d5a2d 100%);
+    background-image:
+        /* Center circle */
+        radial-gradient(circle at 50% 50%, transparent 60px, rgba(255,255,255,0.3) 61px, rgba(255,255,255,0.3) 63px, transparent 64px),
+        /* Center line */
+        linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,0.4) calc(50% - 1px), rgba(255,255,255,0.4) calc(50% + 1px), transparent calc(50% + 1px)),
+        /* Penalty areas */
+        linear-gradient(180deg, transparent 20%, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.2) 21%, transparent 21%, transparent 79%, rgba(255,255,255,0.2) 79%, rgba(255,255,255,0.2) 80%, transparent 80%),
+        /* Side lines */
+        linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 2px, transparent 2px, transparent calc(100% - 2px), rgba(255,255,255,0.3) calc(100% - 2px), rgba(255,255,255,0.3) 100%),
+        /* Goal lines */
+        linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 2px, transparent 2px, transparent calc(100% - 2px), rgba(255,255,255,0.3) calc(100% - 2px), rgba(255,255,255,0.3) 100%);
+    padding: 2rem;
+    border-radius: 10px;
+    color: white;
+    font-family: monospace;
+    border: 3px solid rgba(255,255,255,0.4);
+    position: relative;
+}
     .stProgress .st-bo {
         background-color: #e8f4fd;
     }
@@ -799,6 +808,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
