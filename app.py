@@ -415,7 +415,6 @@ with st.sidebar:
     """)
 
 # File Upload Section
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown("## 📁 Upload Player Data")
 
 st.markdown("""
@@ -798,6 +797,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
