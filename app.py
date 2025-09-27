@@ -395,7 +395,7 @@ with st.sidebar:
     # Role selection
     ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
     role = st.selectbox(
-        "Choose Position to Score by",
+        "Choose Position to display score for",
         ROLE_OPTIONS,
         index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
         help="Not necessary since I also include a top 10 for every position"
@@ -404,9 +404,9 @@ with st.sidebar:
     # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
-    **Role Weights**: From FMScout (IMO still accurate even if outdated unlike the FM-Arena attribute testing)
+    **Position Weights Score**: From FMScout (IMO still accurate even if outdated unlike the FM-Arena attribute testing)
 
-    **Scoring**: Higher scores means better fit in that role. Some positions are just naturally inflated for every player.
+    **Scoring**: Higher scores means better fit in that position. Some positions are just naturally inflated for every player.
 
     **Deduplication**: Keeps the best version of duplicate entries.
     """)
@@ -734,6 +734,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
