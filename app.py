@@ -716,51 +716,263 @@ def render_xi(chosen_map, team_name="Team"):
     lines.append("</div>")
 
     return "".join(lines)
-# Generate both teams
-all_player_indices = list(range(n_players))
-first_choice = choose_starting_xi(all_player_indices, score_matrix)
-used_player_indices = set(first_choice.values())
-remaining_players = [i for i in all_player_indices if i not in used_player_indices]
-second_choice = choose_starting_xi(remaining_players, score_matrix)
 
-st.markdown("<br>", unsafe_allow_html=True)
-# Display both teams side by side
+# ---------- START TEAMBUILDER UI (REPLACE the old "Generate both teams" block) ----------
+
+# NOTE: This teambuilder relies on these variables already defined above:
+#   - n_players
+#   - player_names (list)
+#   - available_attrs_final, attrs_norm_final, df_final
+#   - WEIGHTS_BY_ROLE
+#   - choose_starting_xi (function)
+#   - score_matrix (will be recomputed on formation change)
+
+# Helper: formation presets -> returns formation_lines like your original structure
+FORMATION_PRESETS = {
+    "4-2-3-1": [
+        ("GK", "GK"),
+        ("EMPTY", "EMPTY"),
+        ("RB", "DL/DR"),
+        ("CB", "CB"),
+        ("CB", "CB"),
+        ("LB", "DL/DR"),
+        ("EMPTY", "EMPTY"),
+        ("DM", "DM"),
+        ("DM", "DM"),
+        ("EMPTY", "EMPTY"),
+        ("AMR", "AML/AMR"),
+        ("AMC", "AMC"),
+        ("AML", "AML/AMR"),
+        ("EMPTY", "EMPTY"),
+        ("ST", "ST")
+    ],
+    "4-4-2": [
+        ("GK","GK"),
+        ("EMPTY","EMPTY"),
+        ("RB","DL/DR"),
+        ("CB","CB"),
+        ("CB","CB"),
+        ("LB","DL/DR"),
+        ("EMPTY","EMPTY"),
+        ("RM","ML/MR"),
+        ("CM","CM"),
+        ("CM","CM"),
+        ("LM","ML/MR"),
+        ("EMPTY","EMPTY"),
+        ("ST","ST"),
+        ("ST2","ST"),
+        ("EMPTY","EMPTY")
+    ],
+    "3-5-2": [
+        ("GK","GK"),
+        ("EMPTY","EMPTY"),
+        ("RCB","CB"),
+        ("CB","CB"),
+        ("LCB","CB"),
+        ("EMPTY","EMPTY"),
+        ("RWB","WBL/WBR"),
+        ("CM","CM"),
+        ("CM2","CM"),
+        ("LWB","WBL/WBR"),
+        ("EMPTY","EMPTY"),
+        ("ST","ST"),
+        ("ST2","ST"),
+        ("EMPTY","EMPTY"),
+        ("EMPTY","EMPTY")
+    ]
+}
+
+def build_positions_from_preset(preset_name):
+    lines = FORMATION_PRESETS.get(preset_name, FORMATION_PRESETS["4-2-3-1"])
+    return [(label, role) for label, role in lines if role != "EMPTY"]
+
+def compute_role_weight_vectors(available_attrs, positions_list):
+    role_weight_vectors_local = {}
+    for _, role_key in positions_list:
+        if role_key not in role_weight_vectors_local:
+            rw = WEIGHTS_BY_ROLE.get(role_key, {})
+            role_weight_vectors_local[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
+    return role_weight_vectors_local
+
+def compute_score_matrix_for_positions(attrs_df_local, available_attrs_local, positions_list, role_weight_vectors_local):
+    n_players_local = len(attrs_df_local)
+    n_positions_local = len(positions_list)
+    m = np.zeros((n_players_local, n_positions_local), dtype=float)
+    for i_idx in range(n_players_local):
+        player_attr_vals = attrs_df_local.iloc[i_idx].values if len(available_attrs_local) > 0 else np.zeros((len(available_attrs_local),), dtype=float)
+        for p_idx, (_, role_key) in enumerate(positions_list):
+            w = role_weight_vectors_local[role_key]
+            m[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
+    return m
+
+# Session state init
+if 'teambuilder' not in st.session_state:
+    st.session_state.teambuilder = {
+        "formation": "4-2-3-1",
+        "positions": build_positions_from_preset("4-2-3-1"),
+        "teams": {0: {}, 1: {}},  # maps team_idx -> {position_index: player_idx}
+        "show_candidates": {},   # maps (team_idx, pos_idx) -> bool
+    }
+
+# React to formation change
+formation_choice = st.selectbox("Choose formation for teambuilder", list(FORMATION_PRESETS.keys()), index=list(FORMATION_PRESETS.keys()).index(st.session_state.teambuilder["formation"]))
+if formation_choice != st.session_state.teambuilder["formation"]:
+    st.session_state.teambuilder["formation"] = formation_choice
+    st.session_state.teambuilder["positions"] = build_positions_from_preset(formation_choice)
+    # clear teams when formation changes
+    st.session_state.teambuilder["teams"] = {0: {}, 1: {}}
+    st.session_state.teambuilder["show_candidates"] = {}
+
+# Recompute role vectors and score matrix for current formation
+positions = st.session_state.teambuilder["positions"]
+role_weight_vectors = compute_role_weight_vectors(available_attrs_final, positions)
+score_matrix = compute_score_matrix_for_positions(attrs_norm_final, available_attrs_final, positions, role_weight_vectors)
+
+# Utility functions for picking
+def get_best_available_player_for_position(pos_idx, exclude_set):
+    scores_for_pos = score_matrix[:, pos_idx]
+    best_idx = None
+    best_score = -1e12
+    for i_idx, val in enumerate(scores_for_pos):
+        if i_idx in exclude_set:
+            continue
+        if val > best_score:
+            best_score = val
+            best_idx = i_idx
+    return best_idx, best_score
+
+def get_candidates_for_position(pos_idx, exclude_set=None, top_n=20):
+    if exclude_set is None:
+        exclude_set = set()
+    vals = [(i, float(score_matrix[i, pos_idx])) for i in range(score_matrix.shape[0]) if i not in exclude_set]
+    vals_sorted = sorted(vals, key=lambda x: x[1], reverse=True)
+    return [(i, player_names[i], int(round(s))) for i, s in vals_sorted[:top_n]]
+
+def autopick_team(team_idx, exclude_players=None):
+    if exclude_players is None:
+        exclude_players = set()
+    all_indices = [i for i in range(score_matrix.shape[0]) if i not in exclude_players]
+    chosen_map = choose_starting_xi(all_indices, score_matrix)
+    team_map = {}
+    for pos_idx, player_idx in chosen_map.items():
+        team_map[pos_idx] = int(player_idx)
+    st.session_state.teambuilder["teams"][team_idx] = team_map
+
+def clear_team(team_idx):
+    st.session_state.teambuilder["teams"][team_idx] = {}
+    keys = [k for k in st.session_state.teambuilder["show_candidates"].keys() if k[0] == team_idx]
+    for k in keys:
+        st.session_state.teambuilder["show_candidates"].pop(k, None)
+
+# UI rendering for a single team column
+def render_team_column(team_idx, title):
+    teams = st.session_state.teambuilder["teams"]
+    team_map = teams.get(team_idx, {})
+    used_by_other = set()
+    other_team_idx = 1 - team_idx
+    if other_team_idx in teams:
+        used_by_other = set(teams[other_team_idx].values())
+
+    col_header = f"{title} (Team {team_idx+1})"
+    st.markdown(f"### {col_header}")
+
+    # Action buttons
+    row_actions = st.columns([1,1,1,1])
+    with row_actions[0]:
+        if st.button("Autopick", key=f"autopick_{team_idx}"):
+            exclude = set(st.session_state.teambuilder["teams"].get(1-team_idx, {}).values())
+            autopick_team(team_idx, exclude_players=exclude)
+    with row_actions[1]:
+        if st.button("Clear", key=f"clear_{team_idx}"):
+            clear_team(team_idx)
+    with row_actions[2]:
+        if st.button("Autopick (force best, ignore other)", key=f"autopick_force_{team_idx}"):
+            autopick_team(team_idx, exclude_players=set())
+    with row_actions[3]:
+        st.write("")
+
+    st.markdown("<small>Click a slot to select best player for that role. Click the chosen player to open alternatives / remove.</small>", unsafe_allow_html=True)
+
+    for pos_idx, (label, role_key) in enumerate(positions):
+        cols_slot = st.columns([1,6,2])
+        with cols_slot[0]:
+            st.markdown(f"**{label}**")
+        chosen_player_idx = team_map.get(pos_idx, None)
+        with cols_slot[1]:
+            display_name = "---" if chosen_player_idx is None else player_names[chosen_player_idx]
+            btn_key = f"team{team_idx}_slot{pos_idx}"
+            if st.button(display_name, key=btn_key):
+                already_selected = set(team_map.values())
+                exclude_set = set(st.session_state.teambuilder["teams"].get(1-team_idx, {}).values()) | already_selected
+                if chosen_player_idx is None:
+                    best_idx, _ = get_best_available_player_for_position(pos_idx, exclude_set)
+                    if best_idx is not None:
+                        st.session_state.teambuilder["teams"].setdefault(team_idx, {})[pos_idx] = int(best_idx)
+                else:
+                    cur = st.session_state.teambuilder["show_candidates"].get((team_idx, pos_idx), False)
+                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = not cur
+
+        with cols_slot[2]:
+            score_display = "" if chosen_player_idx is None else f"{int(round(score_matrix[chosen_player_idx, pos_idx]))} pts"
+            st.markdown(f"{score_display}")
+
+        if st.session_state.teambuilder["show_candidates"].get((team_idx, pos_idx), False):
+            in_this_team_selected = set(team_map.values())
+            exclude_for_list = set(st.session_state.teambuilder["teams"].get(1-team_idx, {}).values())
+            candidates = get_candidates_for_position(pos_idx, exclude_set=exclude_for_list, top_n=30)
+
+            options = [f"{name} — {score} pts (idx {idx})" for idx, name, score in candidates]
+            sel_key = f"cand_select_{team_idx}_{pos_idx}"
+            default_sel = 0
+            choice = st.selectbox("Choose alternative (or keep/remove)", options, index=default_sel, key=sel_key)
+            chosen_option_idx = candidates[options.index(choice)][0]
+
+            c1, c2, c3 = st.columns([1,1,1])
+            with c1:
+                if st.button("Replace", key=f"replace_{team_idx}_{pos_idx}"):
+                    st.session_state.teambuilder["teams"].setdefault(team_idx, {})[pos_idx] = int(chosen_option_idx)
+                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = False
+            with c2:
+                if st.button("Remove", key=f"remove_{team_idx}_{pos_idx}"):
+                    st.session_state.teambuilder["teams"].setdefault(team_idx, {}).pop(pos_idx, None)
+                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = False
+            with c3:
+                if st.button("Close", key=f"closecand_{team_idx}_{pos_idx}"):
+                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = False
+
+    assigned = [score_matrix[p_idx, ppos] for ppos, p_idx in team_map.items() if p_idx is not None and ppos < score_matrix.shape[1]]
+    team_total = int(round(sum(assigned))) if assigned else 0
+    team_avg = int(round(np.mean(assigned))) if assigned else 0
+    st.markdown(f"**Team total:** {team_total} | **Average:** {team_avg}")
+
+# Layout: two team columns side-by-side
 col1, col2 = st.columns(2)
 
 with col1:
-    first_xi_html = render_xi(first_choice, "First XI")
-    st.markdown(first_xi_html, unsafe_allow_html=True)
+    render_team_column(0, "First XI")
 
 with col2:
-    second_xi_html = render_xi(second_choice, "Second XI")
-    st.markdown(second_xi_html, unsafe_allow_html=True)
+    render_team_column(1, "Second XI (no overlap if autopicked after First XI)")
 
+# Quick helper to show a table of currently assigned players per team
+def table_of_team(team_idx):
+    team_map = st.session_state.teambuilder["teams"].get(team_idx, {})
+    rows = []
+    for pos_idx, (label, role_key) in enumerate(positions):
+        pid = team_map.get(pos_idx, None)
+        if pid is None:
+            rows.append({"Slot": label, "Role": role_key, "Player": "---", "Score": ""})
+        else:
+            rows.append({"Slot": label, "Role": role_key, "Player": player_names[pid], "Score": int(round(score_matrix[pid, pos_idx]))})
+    return pd.DataFrame(rows)
 
+st.markdown("### Team tables")
+t1, t2 = st.columns(2)
+with t1:
+    st.markdown("**First XI table**")
+    st.dataframe(table_of_team(0), use_container_width=True, height=300)
+with t2:
+    st.markdown("**Second XI table**")
+    st.dataframe(table_of_team(1), use_container_width=True, height=300)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# ---------- END TEAMBUILDER UI ----------
