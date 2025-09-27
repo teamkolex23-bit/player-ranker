@@ -716,263 +716,403 @@ def render_xi(chosen_map, team_name="Team"):
     lines.append("</div>")
 
     return "".join(lines)
+# ---------- START TEAMBUILDER UI (CLIENT-SIDE PITCH) ----------
+import json
+from streamlit.components.v1 import html as st_html
 
-# ---------- START TEAMBUILDER UI (REPLACE the old "Generate both teams" block) ----------
+# Prepare a lightweight JSON payload for the client UI
+players_payload = []
+for i in range(len(player_names)):
+    players_payload.append({
+        "id": int(i),
+        "name": str(player_names[i]),
+        "scores": [float(score_matrix[i, p]) for p in range(score_matrix.shape[1])]
+    })
 
-# NOTE: This teambuilder relies on these variables already defined above:
-#   - n_players
-#   - player_names (list)
-#   - available_attrs_final, attrs_norm_final, df_final
-#   - WEIGHTS_BY_ROLE
-#   - choose_starting_xi (function)
-#   - score_matrix (will be recomputed on formation change)
+positions_payload = [{"index": idx, "label": label, "role": role}
+                     for idx, (label, role) in enumerate(positions)]
 
-# Helper: formation presets -> returns formation_lines like your original structure
-FORMATION_PRESETS = {
-    "4-2-3-1": [
-        ("GK", "GK"),
-        ("EMPTY", "EMPTY"),
-        ("RB", "DL/DR"),
-        ("CB", "CB"),
-        ("CB", "CB"),
-        ("LB", "DL/DR"),
-        ("EMPTY", "EMPTY"),
-        ("DM", "DM"),
-        ("DM", "DM"),
-        ("EMPTY", "EMPTY"),
-        ("AMR", "AML/AMR"),
-        ("AMC", "AMC"),
-        ("AML", "AML/AMR"),
-        ("EMPTY", "EMPTY"),
-        ("ST", "ST")
-    ],
-    "4-4-2": [
-        ("GK","GK"),
-        ("EMPTY","EMPTY"),
-        ("RB","DL/DR"),
-        ("CB","CB"),
-        ("CB","CB"),
-        ("LB","DL/DR"),
-        ("EMPTY","EMPTY"),
-        ("RM","ML/MR"),
-        ("CM","CM"),
-        ("CM","CM"),
-        ("LM","ML/MR"),
-        ("EMPTY","EMPTY"),
-        ("ST","ST"),
-        ("ST2","ST"),
-        ("EMPTY","EMPTY")
-    ],
-    "3-5-2": [
-        ("GK","GK"),
-        ("EMPTY","EMPTY"),
-        ("RCB","CB"),
-        ("CB","CB"),
-        ("LCB","CB"),
-        ("EMPTY","EMPTY"),
-        ("RWB","WBL/WBR"),
-        ("CM","CM"),
-        ("CM2","CM"),
-        ("LWB","WBL/WBR"),
-        ("EMPTY","EMPTY"),
-        ("ST","ST"),
-        ("ST2","ST"),
-        ("EMPTY","EMPTY"),
-        ("EMPTY","EMPTY")
-    ]
+payload = {
+    "players": players_payload,
+    "positions": positions_payload,
+    "n_players": len(players_payload),
+    "n_positions": len(positions_payload)
 }
 
-def build_positions_from_preset(preset_name):
-    lines = FORMATION_PRESETS.get(preset_name, FORMATION_PRESETS["4-2-3-1"])
-    return [(label, role) for label, role in lines if role != "EMPTY"]
+# HTML + JS component: client-side pitch UI (instant, no reruns)
+COMPONENT_HTML = f"""
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  body {{ margin:0; font-family: Arial, Helvetica, sans-serif; color:#fff; background:transparent; }}
+  .container {{ display:flex; gap:16px; }}
+  .panel {{ width:48%; }}
+  .controls {{ display:flex; gap:8px; margin-bottom:8px; }}
+  .pitch {{
+    position: relative;
+    background: linear-gradient(#3b8a3b, #2f702f);
+    border: 4px solid #0b5a0b;
+    height: 620px;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    overflow: visible;
+  }}
+  .slot {{
+    position: absolute;
+    transform: translate(-50%,-50%);
+    min-width: 160px;
+    max-width: 220px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    text-align: center;
+    background: rgba(255,255,255,0.06);
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.12);
+    transition: transform .08s ease, box-shadow .08s ease;
+    user-select: none;
+  }}
+  .slot:hover {{ transform: translate(-50%,-50%) scale(1.02); box-shadow: 0 8px 18px rgba(0,0,0,0.45); }}
+  .slot .label {{ font-weight:700; display:block; margin-bottom:6px; color:#eaf7ea; }}
+  .slot .player {{ font-size:14px; color:#fff; font-weight:600; display:block; }}
+  .slot .score {{ font-size:12px; opacity:0.9; margin-top:4px; color:#ddd; }}
+  .slot.empty .player {{ color: rgba(255,255,255,0.5); font-weight:400; }}
+  .slot.selected {{ background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.18); }}
+  .candidates {{
+    position: absolute;
+    left: 100%;
+    top: -6px;
+    width: 320px;
+    max-height: 420px;
+    overflow:auto;
+    background: rgba(10,10,10,0.9);
+    padding:8px;
+    border-radius:6px;
+    margin-left:12px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    z-index: 9999;
+  }}
+  .cand-row {{ display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; color:#e6e6e6; }}
+  .cand-row button {{ margin-left:8px; background:#1b5f1b; color:#fff; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; }}
+  .summary-box {{ padding:8px; border-radius:6px; background: rgba(0,0,0,0.5); margin-top:8px; color:#fff; }}
+  .export-btn {{ margin-top:6px; padding:8px 10px; border-radius:6px; background:#8a6c00; border:none; color:#fff; cursor:pointer; }}
+  .top-controls {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }}
+  .small-btn {{ padding:6px 8px; border-radius:6px; border:none; cursor:pointer; background:#23527a; color:#fff; }}
+</style>
+</head>
+<body>
+<div class="top-controls" style="margin-bottom:6px;">
+  <div style="font-weight:700;">Client-side Team Builder — instant UI</div>
+  <div>
+    <button id="exportCsv" class="export-btn">Export teams as CSV</button>
+  </div>
+</div>
 
-def compute_role_weight_vectors(available_attrs, positions_list):
-    role_weight_vectors_local = {}
-    for _, role_key in positions_list:
-        if role_key not in role_weight_vectors_local:
-            rw = WEIGHTS_BY_ROLE.get(role_key, {})
-            role_weight_vectors_local[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
-    return role_weight_vectors_local
+<div class="container">
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h3 style="margin:0">First XI</h3>
+      <div>
+        <button id="autopick1" class="small-btn">Autopick</button>
+        <button id="clear1" class="small-btn" style="margin-left:6px;background:#6b2b2b;">Clear</button>
+      </div>
+    </div>
+    <div id="pitch1" class="pitch"></div>
+    <div class="summary-box" id="summary1"></div>
+  </div>
 
-def compute_score_matrix_for_positions(attrs_df_local, available_attrs_local, positions_list, role_weight_vectors_local):
-    n_players_local = len(attrs_df_local)
-    n_positions_local = len(positions_list)
-    m = np.zeros((n_players_local, n_positions_local), dtype=float)
-    for i_idx in range(n_players_local):
-        player_attr_vals = attrs_df_local.iloc[i_idx].values if len(available_attrs_local) > 0 else np.zeros((len(available_attrs_local),), dtype=float)
-        for p_idx, (_, role_key) in enumerate(positions_list):
-            w = role_weight_vectors_local[role_key]
-            m[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
-    return m
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h3 style="margin:0">Second XI</h3>
+      <div>
+        <button id="autopick2" class="small-btn">Autopick (exclude 1)</button>
+        <button id="clear2" class="small-btn" style="margin-left:6px;background:#6b2b2b;">Clear</button>
+      </div>
+    </div>
+    <div id="pitch2" class="pitch"></div>
+    <div class="summary-box" id="summary2"></div>
+  </div>
+</div>
 
-# Session state init
-if 'teambuilder' not in st.session_state:
-    st.session_state.teambuilder = {
-        "formation": "4-2-3-1",
-        "positions": build_positions_from_preset("4-2-3-1"),
-        "teams": {0: {}, 1: {}},  # maps team_idx -> {position_index: player_idx}
-        "show_candidates": {},   # maps (team_idx, pos_idx) -> bool
-    }
+<div style="margin-top:10px; color:#ddd;">Tip: click a slot to pick the best available player. Click again to see top alternatives and replace/remove.</div>
 
-# React to formation change
-formation_choice = st.selectbox("Choose formation for teambuilder", list(FORMATION_PRESETS.keys()), index=list(FORMATION_PRESETS.keys()).index(st.session_state.teambuilder["formation"]))
-if formation_choice != st.session_state.teambuilder["formation"]:
-    st.session_state.teambuilder["formation"] = formation_choice
-    st.session_state.teambuilder["positions"] = build_positions_from_preset(formation_choice)
-    # clear teams when formation changes
-    st.session_state.teambuilder["teams"] = {0: {}, 1: {}}
-    st.session_state.teambuilder["show_candidates"] = {}
+<script>
+const DATA = {json.dumps(payload)};
 
-# Recompute role vectors and score matrix for current formation
-positions = st.session_state.teambuilder["positions"]
-role_weight_vectors = compute_role_weight_vectors(available_attrs_final, positions)
-score_matrix = compute_score_matrix_for_positions(attrs_norm_final, available_attrs_final, positions, role_weight_vectors)
+// A coordinate map (x% left, y% top) — tweak to taste.
+const coordMap = {{
+  "GK": [50, 88],
+  "RB": [80, 68],
+  "LB": [20, 68],
+  "CB": [50, 64],
+  "DL/DR": [80, 68],
+  "WBL/WBR": [80, 56],
+  "DM": [50, 56],
+  "CM": [50, 46],
+  "ML/MR": [20, 40],
+  "AML/AMR": [80, 28],
+  "AMC": [50, 30],
+  "ST": [50, 14],
+  "DEFAULT": [50,50]
+}};
 
-# Utility functions for picking
-def get_best_available_player_for_position(pos_idx, exclude_set):
-    scores_for_pos = score_matrix[:, pos_idx]
-    best_idx = None
-    best_score = -1e12
-    for i_idx, val in enumerate(scores_for_pos):
-        if i_idx in exclude_set:
-            continue
-        if val > best_score:
-            best_score = val
-            best_idx = i_idx
-    return best_idx, best_score
+function coordsForLabel(label, role) {{
+  if (coordMap[role]) return coordMap[role];
+  if (coordMap[label]) return coordMap[label];
+  return coordMap["DEFAULT"];
+}}
 
-def get_candidates_for_position(pos_idx, exclude_set=None, top_n=20):
-    if exclude_set is None:
-        exclude_set = set()
-    vals = [(i, float(score_matrix[i, pos_idx])) for i in range(score_matrix.shape[0]) if i not in exclude_set]
-    vals_sorted = sorted(vals, key=lambda x: x[1], reverse=True)
-    return [(i, player_names[i], int(round(s))) for i, s in vals_sorted[:top_n]]
+const teams = [Array(DATA.n_positions).fill(null), Array(DATA.n_positions).fill(null)];
 
-def autopick_team(team_idx, exclude_players=None):
-    if exclude_players is None:
-        exclude_players = set()
-    all_indices = [i for i in range(score_matrix.shape[0]) if i not in exclude_players]
-    chosen_map = choose_starting_xi(all_indices, score_matrix)
-    team_map = {}
-    for pos_idx, player_idx in chosen_map.items():
-        team_map[pos_idx] = int(player_idx)
-    st.session_state.teambuilder["teams"][team_idx] = team_map
+function createPitch(containerId, teamIdx) {{
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  container.style.position = "relative";
+  DATA.positions.forEach(pos => {{
+    const [x, y] = coordsForLabel(pos.label, pos.role);
+    const el = document.createElement('div');
+    el.className = 'slot empty';
+    el.style.left = x + '%';
+    el.style.top = y + '%';
+    el.dataset.pos = pos.index;
+    el.dataset.team = teamIdx;
 
-def clear_team(team_idx):
-    st.session_state.teambuilder["teams"][team_idx] = {}
-    keys = [k for k in st.session_state.teambuilder["show_candidates"].keys() if k[0] == team_idx]
-    for k in keys:
-        st.session_state.teambuilder["show_candidates"].pop(k, None)
+    const lbl = document.createElement('span');
+    lbl.className = 'label';
+    lbl.textContent = pos.label;
 
-# UI rendering for a single team column
-def render_team_column(team_idx, title):
-    teams = st.session_state.teambuilder["teams"]
-    team_map = teams.get(team_idx, {})
-    used_by_other = set()
-    other_team_idx = 1 - team_idx
-    if other_team_idx in teams:
-        used_by_other = set(teams[other_team_idx].values())
+    const player = document.createElement('span');
+    player.className = 'player';
+    player.textContent = '---';
 
-    col_header = f"{title} (Team {team_idx+1})"
-    st.markdown(f"### {col_header}")
+    const score = document.createElement('span');
+    score.className = 'score';
+    score.textContent = '';
 
-    # Action buttons
-    row_actions = st.columns([1,1,1,1])
-    with row_actions[0]:
-        if st.button("Autopick", key=f"autopick_{team_idx}"):
-            exclude = set(st.session_state.teambuilder["teams"].get(1-team_idx, {}).values())
-            autopick_team(team_idx, exclude_players=exclude)
-    with row_actions[1]:
-        if st.button("Clear", key=f"clear_{team_idx}"):
-            clear_team(team_idx)
-    with row_actions[2]:
-        if st.button("Autopick (force best, ignore other)", key=f"autopick_force_{team_idx}"):
-            autopick_team(team_idx, exclude_players=set())
-    with row_actions[3]:
-        st.write("")
+    el.appendChild(lbl);
+    el.appendChild(player);
+    el.appendChild(score);
 
-    st.markdown("<small>Click a slot to select best player for that role. Click the chosen player to open alternatives / remove.</small>", unsafe_allow_html=True)
+    container.appendChild(el);
 
-    for pos_idx, (label, role_key) in enumerate(positions):
-        cols_slot = st.columns([1,6,2])
-        with cols_slot[0]:
-            st.markdown(f"**{label}**")
-        chosen_player_idx = team_map.get(pos_idx, None)
-        with cols_slot[1]:
-            display_name = "---" if chosen_player_idx is None else player_names[chosen_player_idx]
-            btn_key = f"team{team_idx}_slot{pos_idx}"
-            if st.button(display_name, key=btn_key):
-                already_selected = set(team_map.values())
-                exclude_set = set(st.session_state.teambuilder["teams"].get(1-team_idx, {}).values()) | already_selected
-                if chosen_player_idx is None:
-                    best_idx, _ = get_best_available_player_for_position(pos_idx, exclude_set)
-                    if best_idx is not None:
-                        st.session_state.teambuilder["teams"].setdefault(team_idx, {})[pos_idx] = int(best_idx)
-                else:
-                    cur = st.session_state.teambuilder["show_candidates"].get((team_idx, pos_idx), False)
-                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = not cur
+    el.addEventListener('click', (e) => {{
+      e.stopPropagation();
+      onSlotClick(teamIdx, pos.index, el);
+    }});
+  }});
+  updateSummary(teamIdx);
+}}
 
-        with cols_slot[2]:
-            score_display = "" if chosen_player_idx is None else f"{int(round(score_matrix[chosen_player_idx, pos_idx]))} pts"
-            st.markdown(f"{score_display}")
+function getBestAvailable(posIdx, excludeSet) {{
+  let best = null;
+  let bestScore = -Infinity;
+  for (let i=0;i<DATA.players.length;i++) {{
+    if (excludeSet.has(i)) continue;
+    const s = DATA.players[i].scores[posIdx];
+    if (s > bestScore) {{ bestScore = s; best = i; }}
+  }}
+  return {{ idx: best, score: bestScore }};
+}}
 
-        if st.session_state.teambuilder["show_candidates"].get((team_idx, pos_idx), False):
-            in_this_team_selected = set(team_map.values())
-            exclude_for_list = set(st.session_state.teambuilder["teams"].get(1-team_idx, {}).values())
-            candidates = get_candidates_for_position(pos_idx, exclude_set=exclude_for_list, top_n=30)
+function getCandidates(posIdx, excludeSet, topN=30) {{
+  const arr = [];
+  for (let i=0;i<DATA.players.length;i++) {{
+    if (excludeSet.has(i)) continue;
+    arr.push([i, DATA.players[i].name, DATA.players[i].scores[posIdx]]);
+  }}
+  arr.sort((a,b)=> b[2]-a[2]);
+  return arr.slice(0, topN);
+}}
 
-            options = [f"{name} — {score} pts (idx {idx})" for idx, name, score in candidates]
-            sel_key = f"cand_select_{team_idx}_{pos_idx}"
-            default_sel = 0
-            choice = st.selectbox("Choose alternative (or keep/remove)", options, index=default_sel, key=sel_key)
-            chosen_option_idx = candidates[options.index(choice)][0]
+function onSlotClick(teamIdx, posIdx, el) {{
+  // If currently empty -> pick best available
+  const otherTeamIdx = 1 - teamIdx;
+  const currentTeamSet = new Set(teams[teamIdx].filter(x=>x!==null));
+  const excludeForPick = new Set(teams[otherTeamIdx].filter(x=>x!==null));
+  // also exclude other positions in same team to avoid duplicates
+  teams[teamIdx].forEach(x=>{{ if (x!==null) excludeForPick.add(x); }});
 
-            c1, c2, c3 = st.columns([1,1,1])
-            with c1:
-                if st.button("Replace", key=f"replace_{team_idx}_{pos_idx}"):
-                    st.session_state.teambuilder["teams"].setdefault(team_idx, {})[pos_idx] = int(chosen_option_idx)
-                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = False
-            with c2:
-                if st.button("Remove", key=f"remove_{team_idx}_{pos_idx}"):
-                    st.session_state.teambuilder["teams"].setdefault(team_idx, {}).pop(pos_idx, None)
-                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = False
-            with c3:
-                if st.button("Close", key=f"closecand_{team_idx}_{pos_idx}"):
-                    st.session_state.teambuilder["show_candidates"][(team_idx, pos_idx)] = False
+  const curAssigned = teams[teamIdx][posIdx];
+  // remove any existing candidate panel
+  removeAllCandidatePanels();
 
-    assigned = [score_matrix[p_idx, ppos] for ppos, p_idx in team_map.items() if p_idx is not None and ppos < score_matrix.shape[1]]
-    team_total = int(round(sum(assigned))) if assigned else 0
-    team_avg = int(round(np.mean(assigned))) if assigned else 0
-    st.markdown(f"**Team total:** {team_total} | **Average:** {team_avg}")
+  if (curAssigned === null) {{
+    const best = getBestAvailable(posIdx, excludeForPick);
+    if (best.idx !== null) {{
+      teams[teamIdx][posIdx] = best.idx;
+      refreshPitches();
+    }}
+  }} else {{
+    // open candidate panel for this slot
+    openCandidatePanel(teamIdx, posIdx, el);
+  }}
+}}
 
-# Layout: two team columns side-by-side
-col1, col2 = st.columns(2)
+function openCandidatePanel(teamIdx, posIdx, el) {{
+  const otherTeamIdx = 1 - teamIdx;
+  const excludeForList = new Set(teams[otherTeamIdx].filter(x=>x!==null));
+  // allow current assigned player to appear
+  const candidates = getCandidates(posIdx, excludeForList, 50);
 
-with col1:
-    render_team_column(0, "First XI")
+  const panel = document.createElement('div');
+  panel.className = 'candidates';
 
-with col2:
-    render_team_column(1, "Second XI (no overlap if autopicked after First XI)")
+  candidates.forEach(c => {{
+    const row = document.createElement('div');
+    row.className = 'cand-row';
+    const left = document.createElement('div');
+    left.style.flex = '1';
+    left.textContent = `${{c[1]}} — ${{Math.round(c[2])}} pts`;
 
-# Quick helper to show a table of currently assigned players per team
-def table_of_team(team_idx):
-    team_map = st.session_state.teambuilder["teams"].get(team_idx, {})
-    rows = []
-    for pos_idx, (label, role_key) in enumerate(positions):
-        pid = team_map.get(pos_idx, None)
-        if pid is None:
-            rows.append({"Slot": label, "Role": role_key, "Player": "---", "Score": ""})
-        else:
-            rows.append({"Slot": label, "Role": role_key, "Player": player_names[pid], "Score": int(round(score_matrix[pid, pos_idx]))})
-    return pd.DataFrame(rows)
+    const right = document.createElement('div');
+    const btnReplace = document.createElement('button');
+    btnReplace.textContent = 'Replace';
+    btnReplace.addEventListener('click', (ev)=>{{ 
+      teams[teamIdx][posIdx] = c[0];
+      removeAllCandidatePanels();
+      refreshPitches();
+    }});
+    const btnRemove = document.createElement('button');
+    btnRemove.style.background='#6b2b2b';
+    btnRemove.textContent = 'Remove';
+    btnRemove.addEventListener('click', (ev)=>{{ 
+      teams[teamIdx][posIdx] = null;
+      removeAllCandidatePanels();
+      refreshPitches();
+    }});
+    right.appendChild(btnReplace);
+    right.appendChild(btnRemove);
 
-st.markdown("### Team tables")
-t1, t2 = st.columns(2)
-with t1:
-    st.markdown("**First XI table**")
-    st.dataframe(table_of_team(0), use_container_width=True, height=300)
-with t2:
-    st.markdown("**Second XI table**")
-    st.dataframe(table_of_team(1), use_container_width=True, height=300)
+    row.appendChild(left);
+    row.appendChild(right);
+    panel.appendChild(row);
+  }});
 
-# ---------- END TEAMBUILDER UI ----------
+  // Close button
+  const close = document.createElement('div');
+  close.style.textAlign='center';
+  close.style.marginTop='6px';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Close';
+  closeBtn.style.background = '#23527a';
+  closeBtn.style.padding = '6px 8px';
+  closeBtn.style.borderRadius = '6px';
+  closeBtn.style.border = 'none';
+  closeBtn.style.color = '#fff';
+  closeBtn.addEventListener('click', ()=>{ removeAllCandidatePanels(); });
+  close.appendChild(closeBtn);
+  panel.appendChild(close);
+
+  // position panel relative to slot; try to avoid overflow
+  el.appendChild(panel);
+}}
+
+function removeAllCandidatePanels() {{
+  document.querySelectorAll('.candidates').forEach(n=>n.remove());
+}}
+
+function refreshPitches() {{
+  // update all slot UIs and summary
+  for (let teamIdx=0; teamIdx<2; teamIdx++) {{
+    const container = document.getElementById('pitch'+(teamIdx+1));
+    container.querySelectorAll('.slot').forEach(slot => {{
+      const posIdx = parseInt(slot.dataset.pos,10);
+      const pid = teams[teamIdx][posIdx];
+      const playerEl = slot.querySelector('.player');
+      const scoreEl = slot.querySelector('.score');
+      if (pid === null) {{
+        slot.classList.remove('selected');
+        slot.classList.add('empty');
+        playerEl.textContent = '---';
+        scoreEl.textContent = '';
+      }} else {{
+        slot.classList.add('selected');
+        slot.classList.remove('empty');
+        playerEl.textContent = DATA.players[pid].name;
+        scoreEl.textContent = Math.round(DATA.players[pid].scores[posIdx]) + ' pts';
+      }}
+    }});
+    updateSummary(teamIdx);
+  }}
+}}
+
+function updateSummary(teamIdx) {{
+  const summaryEl = document.getElementById('summary'+(teamIdx+1));
+  const assigned = teams[teamIdx].map((pid,posIdx)=> pid===null ? null : DATA.players[pid].scores[posIdx]).filter(x=>x!==null);
+  const total = assigned.reduce((a,b)=>a+b,0);
+  const avg = assigned.length ? (total/assigned.length) : 0;
+  summaryEl.innerHTML = `<strong>Team total:</strong> ${{Math.round(total)}} &nbsp; | &nbsp; <strong>Average:</strong> ${{Math.round(avg)}} &nbsp; | &nbsp; <strong>Players:</strong> ${{assigned.length}}`;
+}}
+
+function autopick(teamIdx, excludeOtherTeam=false) {{
+  // Greedy autopick: best available for each slot (skips players already picked)
+  const otherTeamIdx = 1 - teamIdx;
+  const excludeSet = new Set();
+  if (excludeOtherTeam) {{
+    teams[otherTeamIdx].forEach(x=>{{ if (x!==null) excludeSet.add(x); }});
+  }}
+  // clear team
+  teams[teamIdx] = Array(DATA.n_positions).fill(null);
+  // Fill slots greedily
+  for (let pos=0; pos<DATA.n_positions; pos++) {{
+    // compute best ignoring excludeSet and already-chosen in this team
+    const currentlySelected = new Set(teams[teamIdx].filter(x=>x!==null));
+    const combinedExclude = new Set([...excludeSet, ...currentlySelected]);
+    const best = getBestAvailable(pos, combinedExclude);
+    if (best.idx !== null) {{
+      teams[teamIdx][pos] = best.idx;
+    }}
+  }}
+  refreshPitches();
+}}
+
+function clearTeam(teamIdx) {{
+  teams[teamIdx] = Array(DATA.n_positions).fill(null);
+  refreshPitches();
+}}
+
+function exportCSV() {{
+  const rows = [['Team','Slot','Role','Player','Score']];
+  for (let teamIdx=0; teamIdx<2; teamIdx++) {{
+    for (let pos=0; pos<DATA.n_positions; pos++) {{
+      const p = DATA.positions[pos];
+      const pid = teams[teamIdx][pos];
+      const pname = pid===null ? '' : DATA.players[pid].name;
+      const score = pid===null ? '' : Math.round(DATA.players[pid].scores[pos]);
+      rows.push([`Team ${{teamIdx+1}}`, p.label, p.role, pname, score]);
+    }}
+  }}
+  const csvContent = rows.map(r => r.map(c => `"${{String(c).replace(/"/g,'""')}}"`).join(',')).join('\\n');
+  const blob = new Blob([csvContent], {{ type: 'text/csv;charset=utf-8;' }});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'teams_export.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}}
+
+// init
+createPitch('pitch1', 0);
+createPitch('pitch2', 1);
+refreshPitches();
+
+// wire controls
+document.getElementById('autopick1').addEventListener('click', ()=>{{ autopick(0, false); }});
+document.getElementById('clear1').addEventListener('click', ()=>{{ clearTeam(0); }});
+document.getElementById('autopick2').addEventListener('click', ()=>{{ autopick(1, true); }});
+document.getElementById('clear2').addEventListener('click', ()=>{{ clearTeam(1); }});
+document.getElementById('exportCsv').addEventListener('click', ()=>{{ exportCSV(); }});
+
+// close candidate panels when clicking outside
+document.addEventListener('click', (e) => {{ removeAllCandidatePanels(); }});
+</script>
+</body>
+</html>
+"""
+
+# Render component. Adjust height as you want (800+ if you have tall screens).
+st_html(COMPONENT_HTML, height=820, scrolling=True)
+
+# ---------- END TEAMBUILDER UI (CLIENT-SIDE PITCH) ----------
