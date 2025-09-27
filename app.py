@@ -502,13 +502,7 @@ ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 # Enhanced dataframe display
 cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 
-# Add search functionality
-search_term = st.text_input("Search players", placeholder="Enter player name...")
-if search_term:
-    mask = ranked['Name'].str.contains(search_term, case=False, na=False)
-    display_df = ranked[mask]
-else:
-    display_df = ranked
+display_df = ranked
 
 st.dataframe(
     display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
@@ -740,6 +734,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
