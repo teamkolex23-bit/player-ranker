@@ -434,13 +434,11 @@ uploaded_files = st.file_uploader(
     help="Upload the HTML files exported from Football Manager 2024"
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
 
 if not uploaded_files:
     st.stop()
 
 # Processing files with progress indication
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown("## ⚡ Processing Files")
 
 progress_bar = st.progress(0)
@@ -469,7 +467,6 @@ for i, uploaded in enumerate(uploaded_files):
     dfs.append(df)
 
 status_text.text('Processing complete!')
-st.markdown('</div>', unsafe_allow_html=True)
 
 if not dfs:
     st.error("❌ No valid player data parsed from any uploaded file.")
@@ -497,7 +494,6 @@ df_final = deduplicate_players(df)
 df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
 
 # Dashboard Overview
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown("## 📊 Analysis Dashboard")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -537,10 +533,8 @@ with col4:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
 
 # Main Rankings with enhanced display
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown(f"## 🏆 Top Players for {role}")
 
 ranked = df_sorted.copy()
@@ -563,10 +557,8 @@ st.dataframe(
     height=400
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
 
 # Compact Role Analysis
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown("## ⚽ Role Analysis Overview")
 
 # Role analysis without tabs
@@ -599,10 +591,8 @@ for i in range(0, len(ROLE_OPTIONS), roles_per_row):
 
             st.dataframe(tiny, hide_index=True, use_container_width=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
 
 # Starting XI Section
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown("## ⚽ Starting XI Generator")
 
 st.markdown("""
@@ -796,7 +786,7 @@ with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
