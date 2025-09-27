@@ -422,7 +422,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 uploaded_files = st.file_uploader(
-    "Upload below",
+    "UPLOAD",
     type=["html", "htm"],
     accept_multiple_files=True,
     help="Upload the HTML files you print screened from FM24"
@@ -729,6 +729,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
