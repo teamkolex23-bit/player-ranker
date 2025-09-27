@@ -395,16 +395,16 @@ with st.sidebar:
     # Role selection
     ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
     role = st.selectbox(
-        "Choose Role to Analyze",
+        "Choose Position to Score by",
         ROLE_OPTIONS,
         index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
-        help="Select the position you want to rank players for"
+        help="Not necessary since I also include a top 10 for every position"
     )
 
     # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
-    **Role Weights**: From FMScout (still accurate in FM24 unlike the one from FM-Arena)
+    **Role Weights**: From FMScout (IMO still accurate even if outdated unlike the FM-Arena attribute testing)
 
     **Scoring**: Higher scores means better fit in that role. Some positions are just naturally inflated for every player.
 
@@ -502,21 +502,6 @@ ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 # Enhanced dataframe display
 cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 
-# Add search functionality
-search_term = st.text_input("Search players", placeholder="Enter player name...")
-if search_term:
-    mask = ranked['Name'].str.contains(search_term, case=False, na=False)
-    display_df = ranked[mask]
-else:
-    display_df = ranked
-
-st.dataframe(
-    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
-    use_container_width=True,
-    height=400
-)
-
-
 # Compact Role Analysis
 st.markdown("## Top 10 in each position")
 
@@ -555,7 +540,7 @@ for i in range(0, len(ROLE_OPTIONS), roles_per_row):
 st.markdown("""
 <div class="info-box">
     <strong>Formation Analysis:</strong><br>
-    Hungarian algorithm used to determine what the starting 11 would be, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should be theoretically true as long as their hidden attributes aren't terrible.
+    Hungarian algorithm used to determine what the starting 11, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should theoretically be true as long as their hidden attributes aren't terrible.
 </div>
 """, unsafe_allow_html=True)
 
@@ -741,6 +726,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
