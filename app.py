@@ -509,10 +509,10 @@ for i in range(0, len(roles), per_row):
     for j, r in enumerate(roles[i:i+per_row]):
         with cols[j]:
             rw = WEIGHTS_BY_ROLE.get(r, {})
-            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-            sc = attrs_norm.values.dot(w.values.astype(float))
+            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_deduped}).reindex(available_attrs_deduped).fillna(0.0)
+            sc = attrs_norm_deduped.values.dot(w.values.astype(float))
             
-            tmp = df.copy()
+            tmp = df_out.copy()  # <-- FIX: Use deduplicated df_out
             tmp["Score"] = sc
             tmp_sorted = tmp.sort_values("Score", ascending=False).reset_index(drop=True).head(10)
             tmp_sorted = tmp_sorted.reset_index(drop=True)
@@ -542,9 +542,9 @@ positions = [
     ("ST", "ST"),
 ]
 
-n_players = len(df)
+n_players = len(df_out)  # <-- FIX: Use deduplicated df_out
 n_positions = len(positions)
-player_names = df["Name"].astype(str).tolist()
+player_names = df_out["Name"].astype(str).tolist()  # <-- FIX: Use deduplicated df_out
 
 # precompute role weight vectors aligned with available_attrs
 role_weight_vectors = {}
@@ -556,18 +556,18 @@ for _, role_key in positions:
 score_matrix = np.zeros((n_players, n_positions), dtype=float)
 
 for i_idx in range(n_players):
-    player_attr_vals = attrs_norm.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
+    player_attr_vals = attrs_norm_deduped.iloc[i_idx].values if len(available_attrs_deduped) > 0 else np.zeros((len(available_attrs_deduped),), dtype=float)  # <-- FIX: Use deduplicated attrs_norm_deduped
     for p_idx, (_, role_key) in enumerate(positions):
         w = role_weight_vectors[role_key]
         score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
 
 # helper: find best role for each player across all defined roles
 all_role_keys = list(WEIGHTS_BY_ROLE.keys())
-all_role_vectors = {rk: np.array([float(WEIGHTS_BY_ROLE[rk].get(a, 0.0)) for a in available_attrs], dtype=float) for rk in all_role_keys}
+all_role_vectors = {rk: np.array([float(WEIGHTS_BY_ROLE[rk].get(a, 0.0)) for a in available_attrs_deduped], dtype=float) for rk in all_role_keys}  # <-- FIX: Use deduplicated available_attrs_deduped
 
 player_best_role = []
 for i_idx in range(n_players):
-    player_attr_vals = attrs_norm.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
+    player_attr_vals = attrs_norm_deduped.iloc[i_idx].values if len(available_attrs_deduped) > 0 else np.zeros((len(available_attrs_deduped),), dtype=float)  # <-- FIX: Use deduplicated attrs_norm_deduped
     best_score = -1e9
     best_role = None
     
@@ -757,6 +757,7 @@ st.markdown(second_lines, unsafe_allow_html=True)
 # final download
 csv_bytes = df_out_sorted.to_csv(index=False).encode("utf-8")
 st.download_button("Download ranked CSV (full)", csv_bytes, file_name=f"players_ranked_{role}.csv")
+
 
 
 
