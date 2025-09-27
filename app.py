@@ -716,7 +716,8 @@ def render_xi(chosen_map, team_name="Team"):
     lines.append("</div>")
 
     return "".join(lines)
-# ---------- START TEAMBUILDER UI (CLIENT-SIDE PITCH) ----------
+
+# ---------- START FIXED CLIENT-SIDE TEAMBUILDER (replace previous CLIENT-SIDE block) ----------
 import json
 from streamlit.components.v1 import html as st_html
 
@@ -739,18 +740,18 @@ payload = {
     "n_positions": len(positions_payload)
 }
 
-# HTML + JS component: client-side pitch UI (instant, no reruns)
-COMPONENT_HTML = f"""
+# NOTE: use a plain string (NOT an f-string) and inject the JSON safely below.
+COMPONENT_HTML = """
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <style>
-  body {{ margin:0; font-family: Arial, Helvetica, sans-serif; color:#fff; background:transparent; }}
-  .container {{ display:flex; gap:16px; }}
-  .panel {{ width:48%; }}
-  .controls {{ display:flex; gap:8px; margin-bottom:8px; }}
-  .pitch {{
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#fff; background:transparent; }
+  .container { display:flex; gap:16px; }
+  .panel { width:48%; }
+  .controls { display:flex; gap:8px; margin-bottom:8px; }
+  .pitch {
     position: relative;
     background: linear-gradient(#3b8a3b, #2f702f);
     border: 4px solid #0b5a0b;
@@ -758,8 +759,8 @@ COMPONENT_HTML = f"""
     border-radius: 10px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.6);
     overflow: visible;
-  }}
-  .slot {{
+  }
+  .slot {
     position: absolute;
     transform: translate(-50%,-50%);
     min-width: 160px;
@@ -772,14 +773,14 @@ COMPONENT_HTML = f"""
     border: 1px solid rgba(255,255,255,0.12);
     transition: transform .08s ease, box-shadow .08s ease;
     user-select: none;
-  }}
-  .slot:hover {{ transform: translate(-50%,-50%) scale(1.02); box-shadow: 0 8px 18px rgba(0,0,0,0.45); }}
-  .slot .label {{ font-weight:700; display:block; margin-bottom:6px; color:#eaf7ea; }}
-  .slot .player {{ font-size:14px; color:#fff; font-weight:600; display:block; }}
-  .slot .score {{ font-size:12px; opacity:0.9; margin-top:4px; color:#ddd; }}
-  .slot.empty .player {{ color: rgba(255,255,255,0.5); font-weight:400; }}
-  .slot.selected {{ background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.18); }}
-  .candidates {{
+  }
+  .slot:hover { transform: translate(-50%,-50%) scale(1.02); box-shadow: 0 8px 18px rgba(0,0,0,0.45); }
+  .slot .label { font-weight:700; display:block; margin-bottom:6px; color:#eaf7ea; }
+  .slot .player { font-size:14px; color:#fff; font-weight:600; display:block; }
+  .slot .score { font-size:12px; opacity:0.9; margin-top:4px; color:#ddd; }
+  .slot.empty .player { color: rgba(255,255,255,0.5); font-weight:400; }
+  .slot.selected { background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.18); }
+  .candidates {
     position: absolute;
     left: 100%;
     top: -6px;
@@ -792,13 +793,13 @@ COMPONENT_HTML = f"""
     margin-left:12px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.6);
     z-index: 9999;
-  }}
-  .cand-row {{ display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; color:#e6e6e6; }}
-  .cand-row button {{ margin-left:8px; background:#1b5f1b; color:#fff; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; }}
-  .summary-box {{ padding:8px; border-radius:6px; background: rgba(0,0,0,0.5); margin-top:8px; color:#fff; }}
-  .export-btn {{ margin-top:6px; padding:8px 10px; border-radius:6px; background:#8a6c00; border:none; color:#fff; cursor:pointer; }}
-  .top-controls {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }}
-  .small-btn {{ padding:6px 8px; border-radius:6px; border:none; cursor:pointer; background:#23527a; color:#fff; }}
+  }
+  .cand-row { display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; color:#e6e6e6; }
+  .cand-row button { margin-left:8px; background:#1b5f1b; color:#fff; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; }
+  .summary-box { padding:8px; border-radius:6px; background: rgba(0,0,0,0.5); margin-top:8px; color:#fff; }
+  .export-btn { margin-top:6px; padding:8px 10px; border-radius:6px; background:#8a6c00; border:none; color:#fff; cursor:pointer; }
+  .top-controls { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .small-btn { padding:6px 8px; border-radius:6px; border:none; cursor:pointer; background:#23527a; color:#fff; }
 </style>
 </head>
 <body>
@@ -838,10 +839,10 @@ COMPONENT_HTML = f"""
 <div style="margin-top:10px; color:#ddd;">Tip: click a slot to pick the best available player. Click again to see top alternatives and replace/remove.</div>
 
 <script>
-const DATA = {json.dumps(payload)};
+const DATA = <<PAYLOAD>>;
 
 // A coordinate map (x% left, y% top) — tweak to taste.
-const coordMap = {{
+const coordMap = {
   "GK": [50, 88],
   "RB": [80, 68],
   "LB": [20, 68],
@@ -855,21 +856,21 @@ const coordMap = {{
   "AMC": [50, 30],
   "ST": [50, 14],
   "DEFAULT": [50,50]
-}};
+};
 
-function coordsForLabel(label, role) {{
+function coordsForLabel(label, role) {
   if (coordMap[role]) return coordMap[role];
   if (coordMap[label]) return coordMap[label];
   return coordMap["DEFAULT"];
-}}
+}
 
 const teams = [Array(DATA.n_positions).fill(null), Array(DATA.n_positions).fill(null)];
 
-function createPitch(containerId, teamIdx) {{
+function createPitch(containerId, teamIdx) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
   container.style.position = "relative";
-  DATA.positions.forEach(pos => {{
+  DATA.positions.forEach(pos => {
     const [x, y] = coordsForLabel(pos.label, pos.role);
     const el = document.createElement('div');
     el.className = 'slot empty';
@@ -896,100 +897,94 @@ function createPitch(containerId, teamIdx) {{
 
     container.appendChild(el);
 
-    el.addEventListener('click', (e) => {{
+    el.addEventListener('click', (e) => {
       e.stopPropagation();
       onSlotClick(teamIdx, pos.index, el);
-    }});
-  }});
+    });
+  });
   updateSummary(teamIdx);
-}}
+}
 
-function getBestAvailable(posIdx, excludeSet) {{
+function getBestAvailable(posIdx, excludeSet) {
   let best = null;
   let bestScore = -Infinity;
-  for (let i=0;i<DATA.players.length;i++) {{
+  for (let i=0;i<DATA.players.length;i++) {
     if (excludeSet.has(i)) continue;
     const s = DATA.players[i].scores[posIdx];
-    if (s > bestScore) {{ bestScore = s; best = i; }}
-  }}
-  return {{ idx: best, score: bestScore }};
-}}
+    if (s > bestScore) { bestScore = s; best = i; }
+  }
+  return { idx: best, score: bestScore };
+}
 
-function getCandidates(posIdx, excludeSet, topN=30) {{
+function getCandidates(posIdx, excludeSet, topN=30) {
   const arr = [];
-  for (let i=0;i<DATA.players.length;i++) {{
+  for (let i=0;i<DATA.players.length;i++) {
     if (excludeSet.has(i)) continue;
     arr.push([i, DATA.players[i].name, DATA.players[i].scores[posIdx]]);
-  }}
+  }
   arr.sort((a,b)=> b[2]-a[2]);
   return arr.slice(0, topN);
-}}
+}
 
-function onSlotClick(teamIdx, posIdx, el) {{
-  // If currently empty -> pick best available
+function onSlotClick(teamIdx, posIdx, el) {
   const otherTeamIdx = 1 - teamIdx;
   const currentTeamSet = new Set(teams[teamIdx].filter(x=>x!==null));
   const excludeForPick = new Set(teams[otherTeamIdx].filter(x=>x!==null));
-  // also exclude other positions in same team to avoid duplicates
-  teams[teamIdx].forEach(x=>{{ if (x!==null) excludeForPick.add(x); }});
+  teams[teamIdx].forEach(x=>{ if (x!==null) excludeForPick.add(x); });
 
   const curAssigned = teams[teamIdx][posIdx];
-  // remove any existing candidate panel
   removeAllCandidatePanels();
 
-  if (curAssigned === null) {{
+  if (curAssigned === null) {
     const best = getBestAvailable(posIdx, excludeForPick);
-    if (best.idx !== null) {{
+    if (best.idx !== null) {
       teams[teamIdx][posIdx] = best.idx;
       refreshPitches();
-    }}
-  }} else {{
-    // open candidate panel for this slot
+    }
+  } else {
     openCandidatePanel(teamIdx, posIdx, el);
-  }}
-}}
+  }
+}
 
-function openCandidatePanel(teamIdx, posIdx, el) {{
+function openCandidatePanel(teamIdx, posIdx, el) {
   const otherTeamIdx = 1 - teamIdx;
   const excludeForList = new Set(teams[otherTeamIdx].filter(x=>x!==null));
-  // allow current assigned player to appear
   const candidates = getCandidates(posIdx, excludeForList, 50);
 
   const panel = document.createElement('div');
   panel.className = 'candidates';
 
-  candidates.forEach(c => {{
+  candidates.forEach(c => {
     const row = document.createElement('div');
     row.className = 'cand-row';
     const left = document.createElement('div');
     left.style.flex = '1';
-    left.textContent = `${{c[1]}} — ${{Math.round(c[2])}} pts`;
+    left.textContent = `${c[1]} — ${Math.round(c[2])} pts`;
 
     const right = document.createElement('div');
     const btnReplace = document.createElement('button');
     btnReplace.textContent = 'Replace';
-    btnReplace.addEventListener('click', (ev)=>{{ 
+    btnReplace.addEventListener('click', (ev)=>{ 
       teams[teamIdx][posIdx] = c[0];
       removeAllCandidatePanels();
       refreshPitches();
-    }});
+    });
     const btnRemove = document.createElement('button');
     btnRemove.style.background='#6b2b2b';
     btnRemove.textContent = 'Remove';
-    btnRemove.addEventListener('click', (ev)=>{{ 
+    btnRemove.addEventListener('click', (ev)=>{ 
       teams[teamIdx][posIdx] = null;
       removeAllCandidatePanels();
       refreshPitches();
-    }});
+    });
     right.appendChild(btnReplace);
     right.appendChild(btnRemove);
 
     row.appendChild(left);
     row.appendChild(right);
     panel.appendChild(row);
-  }});
+  });
 
-  // Close button
   const close = document.createElement('div');
   close.style.textAlign='center';
   close.style.marginTop='6px';
@@ -1000,119 +995,114 @@ function openCandidatePanel(teamIdx, posIdx, el) {{
   closeBtn.style.borderRadius = '6px';
   closeBtn.style.border = 'none';
   closeBtn.style.color = '#fff';
-  closeBtn.addEventListener('click', ()=>{ removeAllCandidatePanels(); });
+  closeBtn.addEventListener('click', function(){ removeAllCandidatePanels(); });
   close.appendChild(closeBtn);
   panel.appendChild(close);
 
-  // position panel relative to slot; try to avoid overflow
   el.appendChild(panel);
-}}
+}
 
-function removeAllCandidatePanels() {{
+function removeAllCandidatePanels() {
   document.querySelectorAll('.candidates').forEach(n=>n.remove());
-}}
+}
 
-function refreshPitches() {{
-  // update all slot UIs and summary
-  for (let teamIdx=0; teamIdx<2; teamIdx++) {{
+function refreshPitches() {
+  for (let teamIdx=0; teamIdx<2; teamIdx++) {
     const container = document.getElementById('pitch'+(teamIdx+1));
-    container.querySelectorAll('.slot').forEach(slot => {{
+    container.querySelectorAll('.slot').forEach(slot => {
       const posIdx = parseInt(slot.dataset.pos,10);
       const pid = teams[teamIdx][posIdx];
       const playerEl = slot.querySelector('.player');
       const scoreEl = slot.querySelector('.score');
-      if (pid === null) {{
+      if (pid === null) {
         slot.classList.remove('selected');
         slot.classList.add('empty');
         playerEl.textContent = '---';
         scoreEl.textContent = '';
-      }} else {{
+      } else {
         slot.classList.add('selected');
         slot.classList.remove('empty');
         playerEl.textContent = DATA.players[pid].name;
         scoreEl.textContent = Math.round(DATA.players[pid].scores[posIdx]) + ' pts';
-      }}
-    }});
+      }
+    });
     updateSummary(teamIdx);
-  }}
-}}
+  }
+}
 
-function updateSummary(teamIdx) {{
+function updateSummary(teamIdx) {
   const summaryEl = document.getElementById('summary'+(teamIdx+1));
   const assigned = teams[teamIdx].map((pid,posIdx)=> pid===null ? null : DATA.players[pid].scores[posIdx]).filter(x=>x!==null);
   const total = assigned.reduce((a,b)=>a+b,0);
   const avg = assigned.length ? (total/assigned.length) : 0;
-  summaryEl.innerHTML = `<strong>Team total:</strong> ${{Math.round(total)}} &nbsp; | &nbsp; <strong>Average:</strong> ${{Math.round(avg)}} &nbsp; | &nbsp; <strong>Players:</strong> ${{assigned.length}}`;
-}}
+  summaryEl.innerHTML = `<strong>Team total:</strong> ${Math.round(total)} &nbsp; | &nbsp; <strong>Average:</strong> ${Math.round(avg)} &nbsp; | &nbsp; <strong>Players:</strong> ${assigned.length}`;
+}
 
-function autopick(teamIdx, excludeOtherTeam=false) {{
-  // Greedy autopick: best available for each slot (skips players already picked)
+function autopick(teamIdx, excludeOtherTeam=false) {
   const otherTeamIdx = 1 - teamIdx;
   const excludeSet = new Set();
-  if (excludeOtherTeam) {{
-    teams[otherTeamIdx].forEach(x=>{{ if (x!==null) excludeSet.add(x); }});
-  }}
-  // clear team
+  if (excludeOtherTeam) {
+    teams[otherTeamIdx].forEach(x=>{ if (x!==null) excludeSet.add(x); });
+  }
   teams[teamIdx] = Array(DATA.n_positions).fill(null);
-  // Fill slots greedily
-  for (let pos=0; pos<DATA.n_positions; pos++) {{
-    // compute best ignoring excludeSet and already-chosen in this team
+  for (let pos=0; pos<DATA.n_positions; pos++) {
     const currentlySelected = new Set(teams[teamIdx].filter(x=>x!==null));
     const combinedExclude = new Set([...excludeSet, ...currentlySelected]);
     const best = getBestAvailable(pos, combinedExclude);
-    if (best.idx !== null) {{
+    if (best.idx !== null) {
       teams[teamIdx][pos] = best.idx;
-    }}
-  }}
+    }
+  }
   refreshPitches();
-}}
+}
 
-function clearTeam(teamIdx) {{
+function clearTeam(teamIdx) {
   teams[teamIdx] = Array(DATA.n_positions).fill(null);
   refreshPitches();
-}}
+}
 
-function exportCSV() {{
+function exportCSV() {
   const rows = [['Team','Slot','Role','Player','Score']];
-  for (let teamIdx=0; teamIdx<2; teamIdx++) {{
-    for (let pos=0; pos<DATA.n_positions; pos++) {{
+  for (let teamIdx=0; teamIdx<2; teamIdx++) {
+    for (let pos=0; pos<DATA.n_positions; pos++) {
       const p = DATA.positions[pos];
       const pid = teams[teamIdx][pos];
       const pname = pid===null ? '' : DATA.players[pid].name;
       const score = pid===null ? '' : Math.round(DATA.players[pid].scores[pos]);
-      rows.push([`Team ${{teamIdx+1}}`, p.label, p.role, pname, score]);
-    }}
-  }}
-  const csvContent = rows.map(r => r.map(c => `"${{String(c).replace(/"/g,'""')}}"`).join(',')).join('\\n');
-  const blob = new Blob([csvContent], {{ type: 'text/csv;charset=utf-8;' }});
+      rows.push([`Team ${teamIdx+1}`, p.label, p.role, pname, score]);
+    }
+  }
+  const csvContent = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = 'teams_export.csv';
   a.click();
   URL.revokeObjectURL(url);
-}}
+}
 
 // init
 createPitch('pitch1', 0);
 createPitch('pitch2', 1);
 refreshPitches();
 
-// wire controls
-document.getElementById('autopick1').addEventListener('click', ()=>{{ autopick(0, false); }});
-document.getElementById('clear1').addEventListener('click', ()=>{{ clearTeam(0); }});
-document.getElementById('autopick2').addEventListener('click', ()=>{{ autopick(1, true); }});
-document.getElementById('clear2').addEventListener('click', ()=>{{ clearTeam(1); }});
-document.getElementById('exportCsv').addEventListener('click', ()=>{{ exportCSV(); }});
+document.getElementById('autopick1').addEventListener('click', ()=>{ autopick(0, false); });
+document.getElementById('clear1').addEventListener('click', ()=>{ clearTeam(0); });
+document.getElementById('autopick2').addEventListener('click', ()=>{ autopick(1, true); });
+document.getElementById('clear2').addEventListener('click', ()=>{ clearTeam(1); });
+document.getElementById('exportCsv').addEventListener('click', ()=>{ exportCSV(); });
 
-// close candidate panels when clicking outside
-document.addEventListener('click', (e) => {{ removeAllCandidatePanels(); }});
+document.addEventListener('click', (e) => { removeAllCandidatePanels(); });
 </script>
 </body>
 </html>
 """
 
-# Render component. Adjust height as you want (800+ if you have tall screens).
-st_html(COMPONENT_HTML, height=820, scrolling=True)
+# Inject payload JSON safely (replace placeholder)
+COMPONENT_HTML = COMPONENT_HTML.replace("<<PAYLOAD>>", json.dumps(payload))
 
-# ---------- END TEAMBUILDER UI (CLIENT-SIDE PITCH) ----------
+# Render component. Adjust height if you want (e.g., 820).
+st_html(COMPONENT_HTML, height=820, scrolling=True)
+# ---------- END FIXED CLIENT-SIDE TEAMBUILDER (replace previous CLIENT-SIDE block) ----------
+
