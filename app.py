@@ -795,7 +795,7 @@ def render_xi(chosen_map, team_name="Team"):
     </div>""")
     lines.append("</div>")
 
-    return "
+    return "".join(lines)
 # Generate both teams
 all_player_indices = list(range(n_players))
 first_choice = choose_starting_xi(all_player_indices, score_matrix)
@@ -816,6 +816,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
