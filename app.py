@@ -434,7 +434,16 @@ if not uploaded_files:
 # Process files and show summary
 dfs = []
 file_results = []
-for uploaded in uploaded_files:
+
+# Create progress bar
+progress_bar = st.progress(0)
+status_text = st.empty()
+
+for i, uploaded in enumerate(uploaded_files):
+    # Update progress
+    progress_bar.progress((i + 1) / len(uploaded_files))
+    status_text.text(f'Processing {uploaded.name}...')
+    
     raw = uploaded.read()
     try:
         html_text = raw.decode('utf-8', errors='ignore')
@@ -450,6 +459,10 @@ for uploaded in uploaded_files:
     df = df.reset_index(drop=True)
     dfs.append(df)
     file_results.append(f"✅ {uploaded.name}: {len(df)} players loaded")
+
+# Complete the progress bar
+progress_bar.progress(1.0)
+status_text.text('Processing complete!')
 
 if not dfs:
     st.error("❌ No valid player data parsed from any uploaded file.")
@@ -728,6 +741,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
