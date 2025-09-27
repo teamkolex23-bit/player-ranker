@@ -756,46 +756,46 @@ def render_xi(chosen_map, team_name="Team"):
     placed_scores = [r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY"]
     team_avg = np.mean(placed_scores) if placed_scores else 0.0
 
-    # Format as table
+# Format as table
     lines = [f"<div class='xi-formation'>"]
     lines.append(f"<h3 style='text-align: center; margin-bottom: 1rem;'>{team_name}</h3>")
 
-for pos_label, name, sel_score, role_key in rows:
-    if role_key == "EMPTY":
-        lines.append("<div style='height: 20px;'></div>")  # Empty space
-    else:
-        sel_score_int = int(round(sel_score))
-        
-        # Calculate color based on difference from team average
-        diff_from_avg = sel_score - team_avg
-        
-        # Normalize difference to a 0-1 scale (400 points = full intensity)
-        intensity = min(abs(diff_from_avg) / 400.0, 1.0)
-        
-        # Calculate RGB values
-        if diff_from_avg >= 0:  # Above average - green
-            red = int(255 * (1 - intensity))
-            green = 255
-            blue = int(255 * (1 - intensity))
-        else:  # Below average - red
-            red = 255
-            green = int(255 * (1 - intensity))
-            blue = int(255 * (1 - intensity))
-        
-        name_color = f"rgb({red}, {green}, {blue})"
-        
-        lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-            <span style='font-weight: bold; min-width: 5rem;'>{pos_label}</span>
-            <span style='font-weight: bold; flex-grow: 1; text-align: center; color: {name_color};'>{name}</span>
-            <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
-        </div>""")
+    for pos_label, name, sel_score, role_key in rows:
+        if role_key == "EMPTY":
+            lines.append("<div style='height: 20px;'></div>")  # Empty space
+        else:
+            sel_score_int = int(round(sel_score))
+            
+            # Calculate color based on difference from team average
+            diff_from_avg = sel_score - team_avg
+            
+            # Normalize difference to a 0-1 scale (400 points = full intensity)
+            intensity = min(abs(diff_from_avg) / 400.0, 1.0)
+            
+            # Calculate RGB values
+            if diff_from_avg >= 0:  # Above average - green
+                red = int(255 * (1 - intensity))
+                green = 255
+                blue = int(255 * (1 - intensity))
+            else:  # Below average - red
+                red = 255
+                green = int(255 * (1 - intensity))
+                blue = int(255 * (1 - intensity))
+            
+            name_color = f"rgb({red}, {green}, {blue})"
+            
+            lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+                <span style='font-weight: bold; min-width: 5rem;'>{pos_label}</span>
+                <span style='font-weight: bold; flex-grow: 1; text-align: center; color: {name_color};'>{name}</span>
+                <span style='min-width: 4rem; text-align: right;'>{sel_score_int} pts</span>
+            </div>""")
 
     lines.append(f"""<div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
         <strong>Team Total: {int(round(team_total))} | Average: {int(round(team_avg))}</strong>
     </div>""")
     lines.append("</div>")
 
-    return "".join(lines)
+    return "
 # Generate both teams
 all_player_indices = list(range(n_players))
 first_choice = choose_starting_xi(all_player_indices, score_matrix)
@@ -816,6 +816,7 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
