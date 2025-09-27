@@ -100,8 +100,7 @@ st.markdown("""
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>⚽ FM24 Player Ranker</h1>
-    <p>Advanced Football Manager 2024 Player Analysis & Team Selection</p>
+    <h1>FM24 Player Ranker</h1>
 </div>
 """, unsafe_allow_html=True)
 
@@ -393,8 +392,6 @@ def deduplicate_players(df):
 
 # Sidebar Configuration
 with st.sidebar:
-    st.markdown("### ⚙️ Configuration")
-
     # Role selection
     ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
     role = st.selectbox(
@@ -407,31 +404,27 @@ with st.sidebar:
     # Analysis info
     st.markdown("### 📈 Analysis Info")
     st.info("""
-    **Role Weights**: Each position uses different attribute weightings based on tactical importance.
+    **Role Weights**: From FMScout (still accurate in FM24 unlike the one from FM-Arena)
 
-    **Scoring**: Higher scores indicate better fit for the selected role.
+    **Scoring**: Higher scores means better fit in that role. Some positions are just naturally inflated for every player.
 
-    **Deduplication**: Keeps the best version when duplicate names are found.
+    **Deduplication**: Keeps the best version of duplicate entries.
     """)
-
-# File Upload Section
-st.markdown("## 📁 Upload Player Data")
 
 st.markdown("""
 <div class="info-box">
     <strong>📋 Upload Instructions:</strong><br>
-    • Maximum 260 players can be processed<br>
     • Go to <a href="https://fmarenacalc.com" target="_blank">fmarenacalc.com</a> for HTML export guide<br>
+    • Maximum 260 players can be exported per html file, so make sure to narrow your search before each print screen<br>
     • Multiple files can be uploaded simultaneously<br>
-    • Supports both .html and .htm files
+    • Supports .html only and not .rtf like the NewGAN mod
 </div>
 """, unsafe_allow_html=True)
 
 uploaded_files = st.file_uploader(
-    "Select your FM24 player HTML files",
     type=["html", "htm"],
     accept_multiple_files=True,
-    help="Upload the HTML files exported from Football Manager 2024"
+    help="Upload the HTML files you print screened from FM24"
 )
 
 
@@ -488,7 +481,7 @@ df_final = deduplicate_players(df)
 df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
 
 # Main Rankings with enhanced display
-st.markdown(f"## 🏆 Top Players for {role}")
+st.markdown(f"## All players weighted as a {role}")
 
 ranked = df_sorted.copy()
 ranked.insert(0, "Rank", range(1, len(ranked) + 1))
@@ -497,7 +490,7 @@ ranked.insert(0, "Rank", range(1, len(ranked) + 1))
 cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
 
 # Add search functionality
-search_term = st.text_input("🔍 Search players", placeholder="Enter player name...")
+search_term = st.text_input("Search players", placeholder="Enter player name...")
 if search_term:
     mask = ranked['Name'].str.contains(search_term, case=False, na=False)
     display_df = ranked[mask]
@@ -512,7 +505,7 @@ st.dataframe(
 
 
 # Compact Role Analysis
-st.markdown("## ⚽ Role Analysis Overview")
+st.markdown("## Top 10 in each position")
 
 # Role analysis without tabs
 available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
@@ -546,18 +539,15 @@ for i in range(0, len(ROLE_OPTIONS), roles_per_row):
 
 
 # Starting XI Section
-st.markdown("## ⚽ Starting XI Generator")
-
 st.markdown("""
 <div class="info-box">
-    <strong>🎯 Formation Analysis:</strong><br>
-    Select your 10 outfield positions below. The app uses the Hungarian algorithm for optimal player-position assignment based on role compatibility scores to maximize overall team strength.
+    <strong>Formation Analysis:</strong><br>
+    Hungarian algorithm used to determine what the starting 11 would be, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should be theoretically true as long as their hidden attributes aren't terrible.
 </div>
 """, unsafe_allow_html=True)
 
 # Fixed Formation Setup
-st.markdown("### ⚙️ Team Formation (4-2-3-1)")
-st.markdown("Using a fixed 4-2-3-1 formation with optimal spacing for team display.")
+st.markdown("### Meta Formation (4-2-3-1)")
 
 # Fixed formation lines with your desired layout
 formation_lines = [
@@ -738,6 +728,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
