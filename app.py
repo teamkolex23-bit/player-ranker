@@ -419,6 +419,43 @@ st.markdown("""
 # Note: df has already been parsed & merged above; deduplicate then compute role scores on df_final.
 
 # Deduplicate (keeps earlier behavior)
+# Collect uploaded HTML files, parse them, and build df_final
+uploaded_files = st.file_uploader("Upload HTML files (exported from FM Arena / fmarenacalc)", type=["html"], accept_multiple_files=True)
+
+if not uploaded_files:
+    st.error("❌ Please upload at least one HTML file containing the player table and then re-run.")
+    st.stop()
+
+dfs = []
+for uploaded_file in uploaded_files:
+    try:
+        raw_bytes = uploaded_file.read()
+    except Exception as e:
+        st.error(f"❌ Failed to read file {uploaded_file.name}: {e}")
+        continue
+
+    # Try UTF-8 then fallback to latin-1
+    try:
+        html_text = raw_bytes.decode("utf-8", errors="strict")
+    except Exception:
+        html_text = raw_bytes.decode("latin-1", errors="ignore")
+
+    parsed_df, parse_err = parse_players_from_html(html_text)
+    if parse_err:
+        st.error(f"❌ Error parsing {uploaded_file.name}: {parse_err}")
+        continue
+
+    dfs.append(parsed_df)
+
+if not dfs:
+    st.error("❌ No valid player tables were parsed from the uploaded files.")
+    st.stop()
+
+# Concatenate parsed dataframes and merge any duplicate-named columns
+df = pd.concat(dfs, ignore_index=True)
+df = merge_duplicate_columns(df)
+
+# Now deduplicate players and produce df_final (same call you intended)
 df_final = deduplicate_players(df)
 
 # Determine attributes that exist for scoring
@@ -664,4 +701,5 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
