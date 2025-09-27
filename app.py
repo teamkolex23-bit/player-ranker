@@ -89,7 +89,13 @@ st.markdown("""
     .stProgress .st-bo {
         background-color: #e8f4fd;
     }
-
+    .upload-section {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        background: #1f2c38;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -770,4 +776,3 @@ with col2:
     st.markdown(second_xi_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
-
