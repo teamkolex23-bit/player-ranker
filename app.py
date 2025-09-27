@@ -438,17 +438,9 @@ uploaded_files = st.file_uploader(
 if not uploaded_files:
     st.stop()
 
-# Processing files with progress indication
-st.markdown("## ⚡ Processing Files")
-
-progress_bar = st.progress(0)
-status_text = st.empty()
-
+# Process files
 dfs = []
-for i, uploaded in enumerate(uploaded_files):
-    status_text.text(f'Processing {uploaded.name}...')
-    progress_bar.progress((i + 1) / len(uploaded_files))
-
+for uploaded in uploaded_files:
     raw = uploaded.read()
     try:
         html_text = raw.decode('utf-8', errors='ignore')
@@ -457,20 +449,39 @@ for i, uploaded in enumerate(uploaded_files):
 
     df, err = parse_players_from_html(html_text)
     if df is None:
-        st.error(f"❌ Parsing failed for {uploaded.name}: {err}")
         continue
-
-    st.success(f"✅ Loaded {len(df)} players from {uploaded.name}")
 
     df = merge_duplicate_columns(df)
     df = df.reset_index(drop=True)
     dfs.append(df)
 
-status_text.text('Processing complete!')
-
 if not dfs:
     st.error("❌ No valid player data parsed from any uploaded file.")
     st.stop()
+
+# Process files and show summary
+dfs = []
+file_results = []
+for uploaded in uploaded_files:
+    raw = uploaded.read()
+    try:
+        html_text = raw.decode('utf-8', errors='ignore')
+    except Exception:
+        html_text = raw.decode('latin-1', errors='ignore')
+
+    df, err = parse_players_from_html(html_text)
+    if df is None:
+        file_results.append(f"❌ {uploaded.name}: Failed to read")
+        continue
+
+    df = merge_duplicate_columns(df)
+    df = df.reset_index(drop=True)
+    dfs.append(df)
+    file_results.append(f"✅ {uploaded.name}: {len(df)} players loaded")
+
+# Show results
+for result in file_results:
+    st.write(result)
 
 # Combine all data
 df = pd.concat(dfs, ignore_index=True)
@@ -744,6 +755,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
