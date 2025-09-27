@@ -390,18 +390,9 @@ def deduplicate_players(df):
 
     return df_deduped.reset_index(drop=True)
 
-# Sidebar Configuration
+# Sidebar Configuration (roles shown in table instead of single-select)
 with st.sidebar:
-    # Role selection
     ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-    role = st.selectbox(
-        "Choose Position to display score for",
-        ROLE_OPTIONS,
-        index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
-        help="Not necessary since I also include a top 10 for every position"
-    )
-
-    # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
     **Position Weights Score**: From FMScout (IMO still accurate even if outdated unlike the FM-Arena attribute testing)
@@ -409,6 +400,8 @@ with st.sidebar:
     **Scoring**: Higher scores means better fit in that position. Some positions are just naturally inflated for every player.
 
     **Deduplication**: Keeps the best version of duplicate entries.
+
+    Now the main table shows a score column for **every role** so you can sort/filter directly.
     """)
 
 st.markdown("""
@@ -421,130 +414,66 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-uploaded_files = st.file_uploader(
-    "Follow the 'Upload Instructions:' above and upload the HTML files you print screened from FM24 here below",
-    type=["html", "htm"],
-    accept_multiple_files=True
-)
 
+# ---- Compute scores for every role and build main table ----
+# Note: df has already been parsed & merged above; deduplicate then compute role scores on df_final.
 
-if not uploaded_files:
-    st.stop()
-
-# Process files and show summary
-dfs = []
-file_results = []
-
-# Create progress bar
-progress_bar = st.progress(0)
-status_text = st.empty()
-
-for i, uploaded in enumerate(uploaded_files):
-    # Update progress
-    progress_bar.progress((i + 1) / len(uploaded_files))
-    status_text.text(f'Processing {uploaded.name}...')
-    
-    raw = uploaded.read()
-    try:
-        html_text = raw.decode('utf-8', errors='ignore')
-    except Exception:
-        html_text = raw.decode('latin-1', errors='ignore')
-
-    df, err = parse_players_from_html(html_text)
-    if df is None:
-        file_results.append(f"❌ {uploaded.name}: Failed to read")
-        continue
-
-    df = merge_duplicate_columns(df)
-    df = df.reset_index(drop=True)
-    dfs.append(df)
-    file_results.append(f"✅ {uploaded.name}: {len(df)} players loaded")
-
-# Complete the progress bar
-progress_bar.progress(1.0)
-status_text.text('Processing complete!')
-
-if not dfs:
-    st.error("❌ No valid player data parsed from any uploaded file.")
-    st.stop()
-
-# Show results
-for result in file_results:
-    st.write(result)
-
-# Combine all data
-df = pd.concat(dfs, ignore_index=True)
-available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
-
-if not available_attrs:
-    st.error("❌ No matching attribute columns found. Detected columns: " + ", ".join(list(df.columns)))
-    st.stop()
-
-# Calculate scores and deduplicate
-attrs_df = df[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df
-
-selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-
-scores = attrs_norm.values.dot(weights.values.astype(float))
-df['Score'] = scores
-
+# Deduplicate (keeps earlier behavior)
 df_final = deduplicate_players(df)
-df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
 
-# Main Rankings with enhanced display
-st.markdown(f"## All players score as a {role}")
+# Determine attributes that exist for scoring
+available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
+if not available_attrs_final:
+    st.error("❌ No matching attribute columns found in deduplicated data. Detected columns: " + ", ".join(list(df_final.columns)))
+    st.stop()
 
-ranked = df_sorted.copy()
-ranked.insert(0, "Rank", range(1, len(ranked) + 1))
+# Attribute DataFrame for numeric ops
+attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
 
-# Enhanced dataframe display
-cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
+# Compute a score column for each role in WEIGHTS_BY_ROLE / ROLE_OPTIONS
+role_score_cols = []
+for r in ROLE_OPTIONS:
+    rw = WEIGHTS_BY_ROLE.get(r, {})
+    # build weight vector aligned with available_attrs_final
+    w = np.array([float(rw.get(a, 0.0)) for a in available_attrs_final], dtype=float)
+    # dot product to compute score for this role
+    sc = attrs_df_final.values.dot(w)
+    colname = f"Score ({r})"
+    # attach to df_final (floating)
+    df_final[colname] = sc
+    role_score_cols.append(colname)
 
-display_df = ranked
+# Optional: compute best role + best score for each player (helps quick sorting/filter)
+df_final["Best Score"] = df_final[role_score_cols].max(axis=1)
+# Extract role name like "Score (ST)" -> "ST"
+df_final["Best Role"] = df_final[role_score_cols].idxmax(axis=1).str.replace(r"^Score \((.+)\)$", r"\1", regex=True)
 
+# Build display DataFrame — show Rank, Name, Position, Age, Transfer Value, Best Role, Best Score, then every role column
+display_cols_core = [c for c in ["Name", "Position", "Age", "Transfer Value"] if c in df_final.columns]
+display_cols = ["Rank"] + display_cols_core + ["Best Role", "Best Score"] + role_score_cols
+
+# Sort by Best Score descending by default so the strongest players bubble to top
+df_sorted_roles = df_final.sort_values("Best Score", ascending=False).reset_index(drop=True)
+df_sorted_roles.insert(0, "Rank", range(1, len(df_sorted_roles) + 1))
+
+# Format numeric columns for display: round scores to integers
+for c in role_score_cols + ["Best Score"]:
+    df_sorted_roles[c] = df_sorted_roles[c].round(0).astype('Int64')
+
+# Show header and interactive dataframe
+st.markdown("## All players — scores for every role (click column headers to sort)")
 st.dataframe(
-    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
+    df_sorted_roles[display_cols],
     use_container_width=True,
-    height=400
+    height=500
 )
 
-# Compact Role Analysis
-st.markdown("## Top 10 in each position")
+# Removed: Top 10 per position section
+# (You can sort the table above by any Role column to get top players for that role.)
+# keep old name for compatibility with downstream code
+attrs_norm_final = attrs_df_final.copy()
+available_attrs_final = available_attrs_final
 
-# Role analysis without tabs
-available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
-attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
-attrs_norm_final = attrs_df_final
-
-roles_per_row = 4
-for i in range(0, len(ROLE_OPTIONS), roles_per_row):
-    cols = st.columns(roles_per_row)
-    for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
-        with cols[j]:
-            st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
-
-            rw = WEIGHTS_BY_ROLE.get(r, {})
-            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
-            sc = attrs_norm_final.values.dot(w.values.astype(float))
-
-            tmp = df_final.copy()
-            tmp["Score"] = sc
-            tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
-            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
-
-            display_cols = ["Rank", "Name", "Score"]
-            if "Age" in tmp_sorted.columns:
-                display_cols.insert(-1, "Age")
-
-            tiny = tmp_sorted[display_cols].copy()
-            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-
-            st.dataframe(tiny, hide_index=True, use_container_width=True)
-
-
-# Starting XI Section
 st.markdown("""
 <div class="info-box">
     <strong>Formation Analysis:</strong><br>
@@ -735,3 +664,4 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
