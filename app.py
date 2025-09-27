@@ -38,6 +38,13 @@ st.markdown("""
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         margin-bottom: 1.5rem;
         border-left: 4px solid #1f4e79;
+        color: #333333;
+    }
+    .section-card h2, .section-card h3 {
+        color: #1f4e79 !important;
+    }
+    .section-card p, .section-card div {
+        color: #333333 !important;
     }
     .info-box {
         background: #f0f8ff;
