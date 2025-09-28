@@ -839,7 +839,8 @@ with tab1:
             else: return '#000000'                         # BLACK
     
     # Create styled dataframe with colors that's sortable
-    role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
+    # Only apply colors to positions with specified thresholds
+    role_columns = ['GK', 'DL/DR', 'CB', 'DM', 'AML/AMR', 'AMC', 'ST']
     
     # Create a styled dataframe using pandas styling
     def style_scores(val, role):
