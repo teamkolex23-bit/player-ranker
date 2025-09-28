@@ -987,21 +987,32 @@ with tab1:
         
         return styles
     
-    # Convert numeric columns to float for proper sorting
+    # Convert numeric columns to integers for proper sorting and display
     numeric_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
+    
+    # Create a copy for sorting
+    sort_df = display_df.copy()
+    
     for col in numeric_columns:
         if col in display_df.columns:
-            # Convert to float but keep empty strings as is
-            display_df[col] = display_df[col].apply(lambda x: float(x) if pd.notna(x) and x != '' else x)
+            # Convert empty strings to NaN for sorting
+            sort_df[col] = pd.to_numeric(sort_df[col], errors='coerce')
+            
+            # Format display values as integers without decimals
+            display_df[col] = display_df[col].apply(lambda x: 
+                f"{int(float(x))}" if pd.notna(x) and x != '' else '')
     
-    # Apply styling and display the dataframe
+    # Apply styling
     styled_df = display_df.style.apply(lambda _: style_df(display_df), axis=None)
     
-    # Display with Streamlit's native dataframe for sorting
+    # Display with sorting enabled
     st.dataframe(
-        styled_df,
+        data=sort_df,
+        column_config={col: st.column_config.NumberColumn(format="%d") 
+                      for col in numeric_columns if col in sort_df.columns},
         use_container_width=True,
-        height=400
+        height=400,
+        hide_index=True
     )
 
 with tab2:
