@@ -5,6 +5,9 @@ import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
 import unicodedata
+from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid.shared import GridUpdateMode
+
 
 # Page config with custom styling
 st.set_page_config(
@@ -533,28 +536,21 @@ comprehensive_df = pd.DataFrame(comprehensive_data)
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 
-st.markdown("## Player Rankings by Position (click header: first click = DESC)")
+st.markdown("## Player Rankings by Position (client-side sort; no full rerun on header clicks)")
 
-# Build AgGrid options and force header sorting order to start with DESC
 gb = GridOptionsBuilder.from_dataframe(comprehensive_df)
-# enable sorting on all columns and set sorting order to start with 'desc'
 gb.configure_default_column(sortable=True, filter=True)
 gridOptions = gb.build()
 
-# Ensure defaultColDef contains sortingOrder (Ag-Grid expects this key)
-# (some GridOptionsBuilder versions don't expose sortingOrder API directly,
-# so we inject it to defaultColDef)
-default_col_def = gridOptions.get("defaultColDef", {})
-default_col_def["sortingOrder"] = ["desc", "asc", None]
-gridOptions["defaultColDef"] = default_col_def
-
-AgGrid(
+# Make sure AgGrid does not send sorting/filtering events back to Streamlit
+# GridUpdateMode.NO_UPDATE => no updates are sent back to Streamlit on client interactions
+ag = AgGrid(
     comprehensive_df,
     gridOptions=gridOptions,
-    enable_enterprise_modules=False,
+    update_mode=GridUpdateMode.NO_UPDATE,   # <--- prevents sorting clicks from triggering a rerun
+    allow_unsafe_jscode=False,
     fit_columns_on_grid_load=True,
-    height=400,
-    allow_unsafe_jscode=False
+    height=400
 )
 
 # Starting XI Section
@@ -752,4 +748,5 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
