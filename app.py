@@ -685,7 +685,7 @@ def render_xi(chosen_map, team_name="Team"):
         return f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
 
     # Colour stops (RGB)
-    BLUE    = (30, 144, 255)
+    BLUE    = (0, 191, 255)
     VGREEN  = (0, 255, 102)
     WHITE   = (255, 255, 255)
     VYELLOW = (255, 212, 0)
@@ -789,4 +789,5 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
