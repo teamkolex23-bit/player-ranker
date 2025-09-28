@@ -555,15 +555,64 @@ default_tab_index = tab_names.index(f"📊 {st.session_state.user_preferences['d
 
 tab1, tab2, tab3 = st.tabs(tab_names)
 
-st.markdown("""
-<div class="info-box">
-    <strong>Upload Instructions:</strong><br>
-    • Go to <a href="https://fmarenacalc.com" target="_blank">fmarenacalc.com</a> for HTML export guide<br>
-    • Maximum 260 players can be exported per html file, so make sure to narrow your search before each print screen<br>
-    • Multiple files can be uploaded simultaneously<br>
-    • Supports .html only and not .rtf like the NewGAN mod
-</div>
-""", unsafe_allow_html=True)
+# Dynamic upload instructions based on status
+def get_upload_instructions_status():
+    """Determine upload status and return appropriate styling"""
+    if 'upload_status' not in st.session_state:
+        st.session_state.upload_status = 'waiting'  # waiting, success, partial, failed
+    
+    return st.session_state.upload_status
+
+# Upload instructions with dynamic styling
+upload_status = get_upload_instructions_status()
+
+if upload_status == 'waiting':
+    # Show normal blue instructions
+    st.markdown("""
+    <div class="info-box">
+        <strong>Upload Instructions:</strong><br>
+        • Go to <a href="https://fmarenacalc.com" target="_blank">fmarenacalc.com</a> for HTML export guide<br>
+        • Maximum 260 players can be exported per html file, so make sure to narrow your search before each print screen<br>
+        • Multiple files can be uploaded simultaneously<br>
+        • Supports .html only and not .rtf like the NewGAN mod
+    </div>
+    """, unsafe_allow_html=True)
+elif upload_status == 'failed':
+    # Show red pulsing instructions for failure
+    st.markdown("""
+    <style>
+    @keyframes pulse-red {
+        0% { background-color: #ff4444; }
+        50% { background-color: #ff6666; }
+        100% { background-color: #ff4444; }
+    }
+    .failed-upload {
+        background: #ff4444;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #cc0000;
+        margin-bottom: 1rem;
+        color: white;
+        animation: pulse-red 2s infinite;
+    }
+    </style>
+    <div class="failed-upload">
+        <strong>⚠️ Upload Failed - Please Follow Instructions:</strong><br>
+        • Go to <a href="https://fmarenacalc.com" target="_blank" style="color: #ffffcc;">fmarenacalc.com</a> for HTML export guide<br>
+        • Maximum 260 players can be exported per html file, so make sure to narrow your search before each print screen<br>
+        • Multiple files can be uploaded simultaneously<br>
+        • Supports .html only and not .rtf like the NewGAN mod
+    </div>
+    """, unsafe_allow_html=True)
+elif upload_status == 'partial':
+    # Show yellow warning for partial success
+    st.markdown("""
+    <div class="info-box" style="background: #fff3cd; border-left: 4px solid #ffc107; color: #856404;">
+        <strong>⚠️ Partial Upload Success:</strong><br>
+        Some files uploaded successfully, but some failed. Check the results below.
+    </div>
+    """, unsafe_allow_html=True)
+# Success case: no instructions shown (they disappear)
 
 uploaded_files = st.file_uploader(
     "Follow the 'Upload Instructions:' above and upload the HTML files you print screened from FM24 here below",
@@ -589,6 +638,8 @@ if file_changed:
 # Process files and show summary
 dfs = []
 file_results = []
+successful_files = 0
+failed_files = 0
 
 # Create progress bar
 progress_bar = st.progress(0)
@@ -608,20 +659,30 @@ for i, uploaded in enumerate(uploaded_files):
     df, err = parse_players_from_html(html_text)
     if df is None:
         file_results.append(f"❌ {uploaded.name}: Failed to read")
+        failed_files += 1
         continue
 
     df = merge_duplicate_columns(df)
     df = df.reset_index(drop=True)
     dfs.append(df)
     file_results.append(f"✅ {uploaded.name}: {len(df)} players loaded")
+    successful_files += 1
 
 # Complete the progress bar
 progress_bar.progress(1.0)
 status_text.text('Processing complete!')
 
-if not dfs:
+# Determine upload status
+if successful_files == 0:
+    st.session_state.upload_status = 'failed'
     st.error("❌ No valid player data parsed from any uploaded file.")
-    st.stop()
+    st.rerun()  # Rerun to show red pulsing instructions
+elif failed_files > 0:
+    st.session_state.upload_status = 'partial'
+    st.rerun()  # Rerun to show yellow warning
+else:
+    st.session_state.upload_status = 'success'
+    st.rerun()  # Rerun to hide instructions
 
 # Show results
 for result in file_results:
