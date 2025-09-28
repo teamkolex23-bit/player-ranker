@@ -433,6 +433,9 @@ with st.sidebar:
     """)
 
 
+# Create tabs for different views
+tab1, tab2, tab3 = st.tabs(["📊 Full Table", "🤖 Automatic Teambuilder", "⚽ Custom Teambuilder"])
+
 st.markdown("""
 <div class="info-box">
     <strong>Upload Instructions:</strong><br>
@@ -537,9 +540,6 @@ for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AM
     comprehensive_data[role] = role_scores[role].round(0).astype(int)
 
 comprehensive_df = pd.DataFrame(comprehensive_data)
-
-# Create tabs for different views
-tab1, tab2, tab3 = st.tabs(["📊 Full Table", "🤖 Automatic Teambuilder", "⚽ Custom Teambuilder"])
 
 with tab1:
     st.markdown("## Player Rankings by Position")
