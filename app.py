@@ -788,7 +788,7 @@ with tab1:
             elif val >= 1300: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1200: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1100: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
         elif role == "DL/DR":
             if val >= 1300: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1250: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -796,7 +796,7 @@ with tab1:
             elif val >= 1000: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 900: return 'rgb(255, 150, 0)'     # VIBRANT ORANGE
             elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
         elif role == "CB":
             if val >= 1500: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1450: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -804,7 +804,7 @@ with tab1:
             elif val >= 1200: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1100: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1000: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
         elif role == "DM":
             if val >= 1400: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1350: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -812,7 +812,7 @@ with tab1:
             elif val >= 1100: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1000: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 900: return 'rgb(255, 0, 0)'       # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
         elif role in ["AML/AMR", "AMC"]:
             if val >= 1500: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1450: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -820,7 +820,7 @@ with tab1:
             elif val >= 1200: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1100: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1000: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
         elif role == "ST":
             if val >= 1700: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1650: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -828,7 +828,7 @@ with tab1:
             elif val >= 1300: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1200: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1100: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
         else:  # WBL/WBR, ML/MR, CM (use DL/DR thresholds)
             if val >= 1300: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1250: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -836,22 +836,36 @@ with tab1:
             elif val >= 1000: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 900: return 'rgb(255, 150, 0)'     # VIBRANT ORANGE
             elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
-            else: return '#000000'                         # BLACK
+            else: return ''                                # EMPTY (was BLACK)
     
     # Create styled dataframe with colors that's sortable
     # Only apply colors to positions with specified thresholds
     role_columns = ['GK', 'DL/DR', 'CB', 'DM', 'AML/AMR', 'AMC', 'ST']
     
+    # Positions that should show empty cells for low scores
+    empty_cell_columns = ['WBL/WBR', 'ML/MR', 'CM']
+    
     # Create a styled dataframe using pandas styling
     def style_scores(val, role):
         if role in role_columns and pd.notna(val) and val != 0:
             color = get_score_color(val, role)
-            return f'color: {color}; font-weight: bold;'
+            if color == '':  # Empty string means don't display the value
+                return 'color: transparent; font-weight: bold;'
+            else:
+                return f'color: {color}; font-weight: bold;'
+        elif role in empty_cell_columns and pd.notna(val) and val != 0:
+            # Check thresholds for empty cells
+            if role in ['WBL/WBR', 'ML/MR'] and val < 700:
+                return 'color: transparent; font-weight: bold;'  # Empty for WBL/WBR, ML/MR below 700
+            elif role == 'CM' and val < 800:
+                return 'color: transparent; font-weight: bold;'  # Empty for CM below 800
         return ''
     
     # Apply styling to the dataframe
     styled_df = comprehensive_df.style
-    for col in role_columns:
+    # Apply styling to both colored columns and empty cell columns
+    all_styled_columns = role_columns + empty_cell_columns
+    for col in all_styled_columns:
         if col in comprehensive_df.columns:
             styled_df = styled_df.apply(lambda x: [style_scores(val, col) for val in x], subset=[col])
     
