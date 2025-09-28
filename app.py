@@ -529,12 +529,32 @@ for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AM
 
 comprehensive_df = pd.DataFrame(comprehensive_data)
 
-# Display the comprehensive table
-st.markdown("## Player Rankings by Position")
-st.dataframe(
+# Requires: pip install streamlit-aggrid
+from st_aggrid import AgGrid
+from st_aggrid.grid_options_builder import GridOptionsBuilder
+
+st.markdown("## Player Rankings by Position (click header: first click = DESC)")
+
+# Build AgGrid options and force header sorting order to start with DESC
+gb = GridOptionsBuilder.from_dataframe(comprehensive_df)
+# enable sorting on all columns and set sorting order to start with 'desc'
+gb.configure_default_column(sortable=True, filter=True)
+gridOptions = gb.build()
+
+# Ensure defaultColDef contains sortingOrder (Ag-Grid expects this key)
+# (some GridOptionsBuilder versions don't expose sortingOrder API directly,
+# so we inject it to defaultColDef)
+default_col_def = gridOptions.get("defaultColDef", {})
+default_col_def["sortingOrder"] = ["desc", "asc", None]
+gridOptions["defaultColDef"] = default_col_def
+
+AgGrid(
     comprehensive_df,
-    use_container_width=True,
-    height=400
+    gridOptions=gridOptions,
+    enable_enterprise_modules=False,
+    fit_columns_on_grid_load=True,
+    height=400,
+    allow_unsafe_jscode=False
 )
 
 # Starting XI Section
@@ -732,3 +752,4 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
