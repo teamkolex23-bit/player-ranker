@@ -888,123 +888,137 @@ with tab1:
             elif col == "ST":
                 display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
     
-    # Create a custom HTML table with colors and working JavaScript sorting
-    def create_sortable_colored_table(df):
-        html = """
-        <style>
-        .player-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: monospace;
-            font-size: 14px;
-            background: #1f2c38;
-            color: #fafafa;
-        }
-        .player-table th {
-            background: #2e4a5a;
-            color: #fafafa;
-            padding: 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-        }
-        .player-table th:hover {
-            background: #3a5a6a;
-        }
-        .player-table td {
-            padding: 6px 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-        }
-        .player-table tr:nth-child(even) {
-            background: #1a252f;
-        }
-        .player-table tr:hover {
-            background: #2a3a4a;
-        }
-        </style>
-        <table class="player-table" id="playerTable">
-        <thead>
-            <tr>
-        """
-        
-        # Add headers with sorting capability
-        for col in df.columns:
-            html += f"<th onclick=\"sortTable({df.columns.get_loc(col)})\">{col}</th>"
-        html += "</tr></thead><tbody>"
-        
-        # Add rows with colors
-        for _, row in df.iterrows():
-            html += "<tr>"
-            for col in df.columns:
-                val = row[col]
-                if col in role_columns and pd.notna(val) and val != 0 and val != '':
-                    # Convert to float for comparison
-                    try:
-                        val_float = float(val)
-                        color = get_score_color(val_float, col)
-                        if color == '':
-                            html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
-                        else:
-                            html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
-                    except (ValueError, TypeError):
-                        html += f"<td>{val}</td>"
-                else:
-                    html += f"<td>{val}</td>"
-            html += "</tr>"
-        
-        html += """
-        </tbody></table>
-        <script>
-        function sortTable(n) {
-            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-            table = document.getElementById("playerTable");
-            switching = true;
-            dir = "asc";
-            while (switching) {
-                switching = false;
-                rows = table.rows;
-                for (i = 1; i < (rows.length - 1); i++) {
-                    shouldSwitch = false;
-                    x = rows[i].getElementsByTagName("TD")[n];
-                    y = rows[i + 1].getElementsByTagName("TD")[n];
-                    
-                    // Get numeric values for proper sorting
-                    var xVal = parseFloat(x.innerHTML) || x.innerHTML.toLowerCase();
-                    var yVal = parseFloat(y.innerHTML) || y.innerHTML.toLowerCase();
-                    
-                    if (dir == "asc") {
-                        if (xVal > yVal) {
-                            shouldSwitch = true;
-                            break;
-                        }
-                    } else if (dir == "desc") {
-                        if (xVal < yVal) {
-                            shouldSwitch = true;
-                            break;
-                        }
-                    }
-                }
-                if (shouldSwitch) {
-                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                    switching = true;
-                    switchcount++;
-                } else {
-                    if (switchcount == 0 && dir == "asc") {
-                        dir = "desc";
-                        switching = true;
-                    }
-                }
-            }
-        }
-        </script>
-        """
-        return html
+    # Use Streamlit's native dataframe - it's sortable by default
+    # We'll add custom CSS to color the text after the table is rendered
+    st.dataframe(
+        comprehensive_df,
+        use_container_width=True,
+        height=400
+    )
     
-    # Display the colored sortable table
-    st.markdown(create_sortable_colored_table(comprehensive_df), unsafe_allow_html=True)
+    # Add custom CSS to color the table cells
+    st.markdown("""
+    <style>
+    /* Target the Streamlit dataframe and color the cells */
+    .stDataFrame {
+        font-family: monospace;
+    }
+    
+    /* This is a workaround - we'll use JavaScript to color the cells */
+    </style>
+    
+    <script>
+    // Wait for the table to load, then apply colors
+    setTimeout(function() {
+        const tables = document.querySelectorAll('.stDataFrame table');
+        if (tables.length > 0) {
+            const table = tables[0];
+            const rows = table.querySelectorAll('tbody tr');
+            
+            // Define role columns and their thresholds
+            const roleColumns = ['GK', 'DL/DR', 'CB', 'DM', 'AML/AMR', 'AMC', 'ST'];
+            const emptyCellColumns = ['WBL/WBR', 'ML/MR', 'CM'];
+            
+            // Get column indices
+            const headers = table.querySelectorAll('thead th');
+            const columnMap = {};
+            headers.forEach((header, index) => {
+                columnMap[header.textContent.trim()] = index;
+            });
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                
+                // Apply colors to role columns
+                roleColumns.forEach(role => {
+                    const colIndex = columnMap[role];
+                    if (colIndex !== undefined) {
+                        const cell = cells[colIndex];
+                        const val = parseFloat(cell.textContent);
+                        
+                        if (!isNaN(val) && val > 0) {
+                            let color = '';
+                            
+                            // Apply color based on role and value
+                            if (role === 'GK') {
+                                if (val >= 1600) color = 'rgb(0, 255, 255)';
+                                else if (val >= 1550) color = 'rgb(0, 255, 0)';
+                                else if (val >= 1400) color = '#ffffff';
+                                else if (val >= 1300) color = 'rgb(255, 255, 0)';
+                                else if (val >= 1200) color = 'rgb(255, 150, 0)';
+                                else if (val >= 1100) color = 'rgb(255, 0, 0)';
+                                else if (val < 1000) color = 'transparent';
+                            } else if (role === 'DL/DR') {
+                                if (val >= 1300) color = 'rgb(0, 255, 255)';
+                                else if (val >= 1250) color = 'rgb(0, 255, 0)';
+                                else if (val >= 1100) color = '#ffffff';
+                                else if (val >= 1000) color = 'rgb(255, 255, 0)';
+                                else if (val >= 900) color = 'rgb(255, 150, 0)';
+                                else if (val >= 800) color = 'rgb(255, 0, 0)';
+                                else if (val < 700) color = 'transparent';
+                            } else if (role === 'CB') {
+                                if (val >= 1500) color = 'rgb(0, 255, 255)';
+                                else if (val >= 1450) color = 'rgb(0, 255, 0)';
+                                else if (val >= 1300) color = '#ffffff';
+                                else if (val >= 1200) color = 'rgb(255, 255, 0)';
+                                else if (val >= 1100) color = 'rgb(255, 150, 0)';
+                                else if (val >= 1000) color = 'rgb(255, 0, 0)';
+                                else if (val < 900) color = 'transparent';
+                            } else if (role === 'DM') {
+                                if (val >= 1400) color = 'rgb(0, 255, 255)';
+                                else if (val >= 1350) color = 'rgb(0, 255, 0)';
+                                else if (val >= 1200) color = '#ffffff';
+                                else if (val >= 1100) color = 'rgb(255, 255, 0)';
+                                else if (val >= 1000) color = 'rgb(255, 150, 0)';
+                                else if (val >= 900) color = 'rgb(255, 0, 0)';
+                                else if (val < 800) color = 'transparent';
+                            } else if (role === 'AML/AMR' || role === 'AMC') {
+                                if (val >= 1500) color = 'rgb(0, 255, 255)';
+                                else if (val >= 1450) color = 'rgb(0, 255, 0)';
+                                else if (val >= 1300) color = '#ffffff';
+                                else if (val >= 1200) color = 'rgb(255, 255, 0)';
+                                else if (val >= 1100) color = 'rgb(255, 150, 0)';
+                                else if (val >= 1000) color = 'rgb(255, 0, 0)';
+                                else if (val < 900) color = 'transparent';
+                            } else if (role === 'ST') {
+                                if (val >= 1700) color = 'rgb(0, 255, 255)';
+                                else if (val >= 1650) color = 'rgb(0, 255, 0)';
+                                else if (val >= 1450) color = '#ffffff';
+                                else if (val >= 1300) color = 'rgb(255, 255, 0)';
+                                else if (val >= 1200) color = 'rgb(255, 150, 0)';
+                                else if (val >= 1100) color = 'rgb(255, 0, 0)';
+                                else if (val < 1000) color = 'transparent';
+                            }
+                            
+                            if (color) {
+                                cell.style.color = color;
+                                cell.style.fontWeight = 'bold';
+                            }
+                        }
+                    }
+                });
+                
+                // Apply empty cell logic to other columns
+                emptyCellColumns.forEach(role => {
+                    const colIndex = columnMap[role];
+                    if (colIndex !== undefined) {
+                        const cell = cells[colIndex];
+                        const val = parseFloat(cell.textContent);
+                        
+                        if (!isNaN(val) && val > 0) {
+                            if ((role === 'WBL/WBR' || role === 'ML/MR') && val < 700) {
+                                cell.style.color = 'transparent';
+                            } else if (role === 'CM' && val < 800) {
+                                cell.style.color = 'transparent';
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    }, 1000); // Wait 1 second for the table to render
+    </script>
+    """, unsafe_allow_html=True)
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
