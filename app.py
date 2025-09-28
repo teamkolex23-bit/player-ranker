@@ -1135,16 +1135,27 @@ with tab1:
     # Process and display the table
     numeric_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
     
-    # Prepare data with caching
-    processed_df = prepare_table_data(display_df, numeric_columns)
+    # Create a copy for sorting (keep numeric values)
+    sort_df = display_df.copy()
+    
+    # Convert to numeric for proper sorting
+    for col in numeric_columns:
+        if col in sort_df.columns:
+            sort_df[col] = pd.to_numeric(sort_df[col], errors='coerce')
+    
+    # Create display version with formatted numbers
+    display_df = sort_df.copy()
+    for col in numeric_columns:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(lambda x: f"{int(x)}" if pd.notna(x) and x != '' else '')
     
     # Apply styling with caching
-    styles = apply_table_styling(processed_df, numeric_columns)
+    styles = apply_table_styling(display_df, numeric_columns)
     
-    # Create final styled dataframe
-    styled_df = processed_df.style.apply(lambda _: styles, axis=None)
+    # Create final styled dataframe using the numeric dataframe for sorting
+    styled_df = sort_df.style.apply(lambda _: styles, axis=None).format(precision=0, na_rep='')
     
-    # Display with optimized settings
+    # Display with optimized settings and proper sorting
     st.dataframe(
         styled_df,
         use_container_width=True,
