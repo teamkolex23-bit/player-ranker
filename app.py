@@ -888,147 +888,29 @@ with tab1:
             elif col == "ST":
                 display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
     
-    # Use st.dataframe with custom CSS for colors
-    st.dataframe(
-        comprehensive_df,
-        use_container_width=True,
-        height=400
-    )
+    # Create a styled dataframe using pandas styling
+    def style_scores(val, role):
+        if role in role_columns and pd.notna(val) and val != 0 and val != '':
+            try:
+                val_float = float(val)
+                color = get_score_color(val_float, role)
+                if color == '':
+                    return 'color: transparent; font-weight: bold;'
+                else:
+                    return f'color: {color}; font-weight: bold;'
+            except (ValueError, TypeError):
+                return ''
+        return ''
     
-    # Add custom CSS to color the table cells
-    st.markdown("""
-    <style>
-    /* Target Streamlit dataframe cells and apply colors */
-    div[data-testid="stDataFrame"] table tbody tr td {
-        font-family: monospace !important;
-    }
+    # Apply styling to the dataframe
+    styled_df = comprehensive_df.style
+    all_styled_columns = role_columns + empty_cell_columns
+    for col in all_styled_columns:
+        if col in comprehensive_df.columns:
+            styled_df = styled_df.apply(lambda x: [style_scores(val, col) for val in x], subset=[col])
     
-    /* Apply colors to specific cells based on their content and column */
-    div[data-testid="stDataFrame"] table tbody tr td:nth-child(2) {
-        /* GK column - adjust nth-child number based on actual column position */
-    }
-    </style>
-    
-    <script>
-    // Function to apply colors after table loads
-    function applyColors() {
-        const dataframe = document.querySelector('[data-testid="stDataFrame"]');
-        if (!dataframe) return;
-        
-        const table = dataframe.querySelector('table');
-        if (!table) return;
-        
-        const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
-        const rows = table.querySelectorAll('tbody tr');
-        
-        // Find column indices
-        const roleColumns = ['GK', 'DL/DR', 'CB', 'DM', 'AML/AMR', 'AMC', 'ST'];
-        const emptyCellColumns = ['WBL/WBR', 'ML/MR', 'CM'];
-        
-        const columnIndices = {};
-        roleColumns.forEach(role => {
-            const index = headers.indexOf(role);
-            if (index !== -1) columnIndices[role] = index;
-        });
-        emptyCellColumns.forEach(role => {
-            const index = headers.indexOf(role);
-            if (index !== -1) columnIndices[role] = index;
-        });
-        
-        rows.forEach(row => {
-            const cells = Array.from(row.querySelectorAll('td'));
-            
-            // Apply colors to role columns
-            Object.entries(columnIndices).forEach(([role, colIndex]) => {
-                if (colIndex < cells.length) {
-                    const cell = cells[colIndex];
-                    const val = parseFloat(cell.textContent);
-                    
-                    if (!isNaN(val) && val > 0) {
-                        let color = '';
-                        
-                        if (role === 'GK') {
-                            if (val >= 1600) color = 'rgb(0, 255, 255)';
-                            else if (val >= 1550) color = 'rgb(0, 255, 0)';
-                            else if (val >= 1400) color = '#ffffff';
-                            else if (val >= 1300) color = 'rgb(255, 255, 0)';
-                            else if (val >= 1200) color = 'rgb(255, 150, 0)';
-                            else if (val >= 1100) color = 'rgb(255, 0, 0)';
-                            else if (val < 1000) color = 'transparent';
-                        } else if (role === 'DL/DR') {
-                            if (val >= 1300) color = 'rgb(0, 255, 255)';
-                            else if (val >= 1250) color = 'rgb(0, 255, 0)';
-                            else if (val >= 1100) color = '#ffffff';
-                            else if (val >= 1000) color = 'rgb(255, 255, 0)';
-                            else if (val >= 900) color = 'rgb(255, 150, 0)';
-                            else if (val >= 800) color = 'rgb(255, 0, 0)';
-                            else if (val < 700) color = 'transparent';
-                        } else if (role === 'CB') {
-                            if (val >= 1500) color = 'rgb(0, 255, 255)';
-                            else if (val >= 1450) color = 'rgb(0, 255, 0)';
-                            else if (val >= 1300) color = '#ffffff';
-                            else if (val >= 1200) color = 'rgb(255, 255, 0)';
-                            else if (val >= 1100) color = 'rgb(255, 150, 0)';
-                            else if (val >= 1000) color = 'rgb(255, 0, 0)';
-                            else if (val < 900) color = 'transparent';
-                        } else if (role === 'DM') {
-                            if (val >= 1400) color = 'rgb(0, 255, 255)';
-                            else if (val >= 1350) color = 'rgb(0, 255, 0)';
-                            else if (val >= 1200) color = '#ffffff';
-                            else if (val >= 1100) color = 'rgb(255, 255, 0)';
-                            else if (val >= 1000) color = 'rgb(255, 150, 0)';
-                            else if (val >= 900) color = 'rgb(255, 0, 0)';
-                            else if (val < 800) color = 'transparent';
-                        } else if (role === 'AML/AMR' || role === 'AMC') {
-                            if (val >= 1500) color = 'rgb(0, 255, 255)';
-                            else if (val >= 1450) color = 'rgb(0, 255, 0)';
-                            else if (val >= 1300) color = '#ffffff';
-                            else if (val >= 1200) color = 'rgb(255, 255, 0)';
-                            else if (val >= 1100) color = 'rgb(255, 150, 0)';
-                            else if (val >= 1000) color = 'rgb(255, 0, 0)';
-                            else if (val < 900) color = 'transparent';
-                        } else if (role === 'ST') {
-                            if (val >= 1700) color = 'rgb(0, 255, 255)';
-                            else if (val >= 1650) color = 'rgb(0, 255, 0)';
-                            else if (val >= 1450) color = '#ffffff';
-                            else if (val >= 1300) color = 'rgb(255, 255, 0)';
-                            else if (val >= 1200) color = 'rgb(255, 150, 0)';
-                            else if (val >= 1100) color = 'rgb(255, 0, 0)';
-                            else if (val < 1000) color = 'transparent';
-                        } else if (role === 'WBL/WBR' || role === 'ML/MR') {
-                            if (val < 700) color = 'transparent';
-                        } else if (role === 'CM') {
-                            if (val < 800) color = 'transparent';
-                        }
-                        
-                        if (color) {
-                            cell.style.color = color;
-                            cell.style.fontWeight = 'bold';
-                        }
-                    }
-                }
-            });
-        });
-    }
-    
-    // Apply colors when page loads
-    setTimeout(applyColors, 500);
-    
-    // Reapply colors when table updates (for sorting)
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList') {
-                setTimeout(applyColors, 100);
-            }
-        });
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-    </script>
-    """, unsafe_allow_html=True)
+    # Use st.table for full styling support (sortable but with colors)
+    st.table(styled_df)
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
