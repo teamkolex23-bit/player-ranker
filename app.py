@@ -888,155 +888,108 @@ with tab1:
             elif col == "ST":
                 display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
     
-    # Create a custom HTML table with colors and working JavaScript sorting
-    def create_sortable_colored_table(df):
-        html = """
-        <style>
-        .player-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: monospace;
-            font-size: 14px;
-            background: #1f2c38;
-            color: #fafafa;
-        }
-        .player-table th {
-            background: #2e4a5a;
-            color: #fafafa;
-            padding: 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-        }
-        .player-table th:hover {
-            background: #3a5a6a;
-        }
-        .player-table td {
-            padding: 6px 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-        }
-        .player-table tr:nth-child(even) {
-            background: #1a252f;
-        }
-        .player-table tr:hover {
-            background: #2a3a4a;
-        }
-        </style>
-        <table class="player-table" id="playerTable">
-        <thead>
-            <tr>
-        """
-        
-        # Add headers with sorting capability
-        for col in df.columns:
-            html += f"<th onclick=\"sortTable({df.columns.get_loc(col)})\">{col}</th>"
-        html += "</tr></thead><tbody>"
-        
-        # Add rows with colors and empty cell logic
-        for _, row in df.iterrows():
-            html += "<tr>"
-            for col in df.columns:
-                val = row[col]
-                
-                # Apply empty cell logic first
-                should_hide = False
-                if col in role_columns and pd.notna(val) and val != 0:
-                    try:
-                        val_float = float(val)
-                        if col == "GK" and val_float < 1000:
-                            should_hide = True
-                        elif col == "DL/DR" and val_float < 700:
-                            should_hide = True
-                        elif col == "CB" and val_float < 900:
-                            should_hide = True
-                        elif col == "DM" and val_float < 800:
-                            should_hide = True
-                        elif col in ["AML/AMR", "AMC"] and val_float < 900:
-                            should_hide = True
-                        elif col == "ST" and val_float < 1000:
-                            should_hide = True
-                    except (ValueError, TypeError):
-                        pass
-                elif col in empty_cell_columns and pd.notna(val) and val != 0:
-                    try:
-                        val_float = float(val)
-                        if col in ["WBL/WBR", "ML/MR"] and val_float < 700:
-                            should_hide = True
-                        elif col == "CM" and val_float < 800:
-                            should_hide = True
-                    except (ValueError, TypeError):
-                        pass
-                
-                if should_hide:
-                    html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
-                elif col in role_columns and pd.notna(val) and val != 0 and val != '':
-                    # Convert to float for comparison
-                    try:
-                        val_float = float(val)
-                        color = get_score_color(val_float, col)
-                        if color == '':
-                            html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
-                        else:
-                            html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
-                    except (ValueError, TypeError):
-                        html += f"<td>{val}</td>"
-                else:
-                    html += f"<td>{val}</td>"
-            html += "</tr>"
-        
-        html += """
-        </tbody></table>
-        <script>
-        function sortTable(n) {
-            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-            table = document.getElementById("playerTable");
-            switching = true;
-            dir = "asc";
-            while (switching) {
-                switching = false;
-                rows = table.rows;
-                for (i = 1; i < (rows.length - 1); i++) {
-                    shouldSwitch = false;
-                    x = rows[i].getElementsByTagName("TD")[n];
-                    y = rows[i + 1].getElementsByTagName("TD")[n];
-                    
-                    // Get numeric values for proper sorting
-                    var xVal = parseFloat(x.innerHTML) || x.innerHTML.toLowerCase();
-                    var yVal = parseFloat(y.innerHTML) || y.innerHTML.toLowerCase();
-                    
-                    if (dir == "asc") {
-                        if (xVal > yVal) {
-                            shouldSwitch = true;
-                            break;
-                        }
-                    } else if (dir == "desc") {
-                        if (xVal < yVal) {
-                            shouldSwitch = true;
-                            break;
-                        }
-                    }
-                }
-                if (shouldSwitch) {
-                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                    switching = true;
-                    switchcount++;
-                } else {
-                    if (switchcount == 0 && dir == "asc") {
-                        dir = "desc";
-                        switching = true;
-                    }
-                }
-            }
-        }
-        </script>
-        """
-        return html
+    # First, handle empty cells for black zone scores and non-colored positions
+    display_df = comprehensive_df.copy()
     
-    # Display the colored sortable table
-    st.markdown(create_sortable_colored_table(comprehensive_df), unsafe_allow_html=True)
+    # Handle WBL/WBR and ML/MR (empty if below 700)
+    for col in ['WBL/WBR', 'ML/MR']:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and float(x) < 700 else x)
+    
+    # Handle CM (empty if below 800)
+    if 'CM' in display_df.columns:
+        display_df['CM'] = display_df['CM'].apply(lambda x: '' if pd.notna(x) and float(x) < 800 else x)
+    
+    # Handle colored positions with black zones
+    black_zone_thresholds = {
+        'GK': 1000,
+        'DL/DR': 700,
+        'CB': 900,
+        'DM': 800,
+        'AML/AMR': 900,
+        'AMC': 900,
+        'ST': 1000
+    }
+    
+    for col, threshold in black_zone_thresholds.items():
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and float(x) < threshold else x)
+    
+    # Create the style function for colors
+    def style_df(df):
+        def color_score(val, col):
+            try:
+                if pd.isna(val) or val == '' or val == 0:
+                    return ''
+                
+                val_float = float(val)
+                
+                # Color coding for each position
+                if col == 'GK':
+                    if val_float >= 1600: return 'color: rgb(0, 255, 255)'
+                    elif val_float >= 1550: return 'color: rgb(0, 255, 0)'
+                    elif val_float >= 1400: return 'color: white'
+                    elif val_float >= 1300: return 'color: rgb(255, 255, 0)'
+                    elif val_float >= 1200: return 'color: rgb(255, 150, 0)'
+                    elif val_float >= 1100: return 'color: rgb(255, 0, 0)'
+                elif col == 'DL/DR':
+                    if val_float >= 1300: return 'color: rgb(0, 255, 255)'
+                    elif val_float >= 1250: return 'color: rgb(0, 255, 0)'
+                    elif val_float >= 1100: return 'color: white'
+                    elif val_float >= 1000: return 'color: rgb(255, 255, 0)'
+                    elif val_float >= 900: return 'color: rgb(255, 150, 0)'
+                    elif val_float >= 800: return 'color: rgb(255, 0, 0)'
+                elif col == 'CB':
+                    if val_float >= 1500: return 'color: rgb(0, 255, 255)'
+                    elif val_float >= 1450: return 'color: rgb(0, 255, 0)'
+                    elif val_float >= 1300: return 'color: white'
+                    elif val_float >= 1200: return 'color: rgb(255, 255, 0)'
+                    elif val_float >= 1100: return 'color: rgb(255, 150, 0)'
+                    elif val_float >= 1000: return 'color: rgb(255, 0, 0)'
+                elif col == 'DM':
+                    if val_float >= 1400: return 'color: rgb(0, 255, 255)'
+                    elif val_float >= 1350: return 'color: rgb(0, 255, 0)'
+                    elif val_float >= 1200: return 'color: white'
+                    elif val_float >= 1100: return 'color: rgb(255, 255, 0)'
+                    elif val_float >= 1000: return 'color: rgb(255, 150, 0)'
+                    elif val_float >= 900: return 'color: rgb(255, 0, 0)'
+                elif col in ['AML/AMR', 'AMC']:
+                    if val_float >= 1500: return 'color: rgb(0, 255, 255)'
+                    elif val_float >= 1450: return 'color: rgb(0, 255, 0)'
+                    elif val_float >= 1300: return 'color: white'
+                    elif val_float >= 1200: return 'color: rgb(255, 255, 0)'
+                    elif val_float >= 1100: return 'color: rgb(255, 150, 0)'
+                    elif val_float >= 1000: return 'color: rgb(255, 0, 0)'
+                elif col == 'ST':
+                    if val_float >= 1700: return 'color: rgb(0, 255, 255)'
+                    elif val_float >= 1650: return 'color: rgb(0, 255, 0)'
+                    elif val_float >= 1450: return 'color: white'
+                    elif val_float >= 1300: return 'color: rgb(255, 255, 0)'
+                    elif val_float >= 1200: return 'color: rgb(255, 150, 0)'
+                    elif val_float >= 1100: return 'color: rgb(255, 0, 0)'
+            except (ValueError, TypeError):
+                return ''
+            return ''
+        
+        # Create a style DataFrame with the same shape as our data
+        styles = pd.DataFrame('', index=df.index, columns=df.columns)
+        
+        # Apply colors only to specified columns
+        for col in df.columns:
+            if col in black_zone_thresholds:
+                styles[col] = df[col].apply(lambda x: color_score(x, col))
+        
+        return styles
+    
+    # Apply styling and display the dataframe
+    styled_df = display_df.style.apply(lambda _: style_df(display_df), axis=None)
+    
+    # Display with Streamlit's native dataframe for sorting
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=400
+    )
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
