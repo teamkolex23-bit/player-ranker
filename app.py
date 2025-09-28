@@ -676,13 +676,11 @@ status_text.text('Processing complete!')
 if successful_files == 0:
     st.session_state.upload_status = 'failed'
     st.error("❌ No valid player data parsed from any uploaded file.")
-    st.rerun()  # Rerun to show red pulsing instructions
+    st.stop()
 elif failed_files > 0:
     st.session_state.upload_status = 'partial'
-    st.rerun()  # Rerun to show yellow warning
 else:
     st.session_state.upload_status = 'success'
-    st.rerun()  # Rerun to hide instructions
 
 # Show results
 for result in file_results:
