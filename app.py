@@ -672,6 +672,78 @@ def render_xi(chosen_map, team_name="Team"):
     team_total = sum(r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY")
     placed_scores = [r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY"]
     team_avg = np.mean(placed_scores) if placed_scores else 0.0
+    # --- Role-specific color thresholds + interpolation helpers ---
+    def _lerp_color(c1, c2, t):
+        """Linearly interpolate two RGB tuples (c1->c2) by t in [0..1]."""
+        return (
+            int(round(c1[0] + (c2[0] - c1[0]) * t)),
+            int(round(c1[1] + (c2[1] - c1[1]) * t)),
+            int(round(c1[2] + (c2[2] - c1[2]) * t))
+        )
+
+    def _rgb_to_css(rgb):
+        return f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
+
+    # Colour stops (RGB)
+    BLUE    = (30, 144, 255)
+    VGREEN  = (0, 255, 102)
+    WHITE   = (255, 255, 255)
+    VYELLOW = (255, 212, 0)
+    VORANGE = (255, 127, 0)
+    VRED    = (255, 0, 51)
+    BLACK   = (0, 0, 0)
+
+    ROLE_THRESHOLDS = {
+        "GK":      [(1600, BLUE), (1550, VGREEN), (1400, WHITE), (1300, VYELLOW), (1200, VORANGE), (1100, VRED), (1000, BLACK)],
+        "DL/DR":   [(1300, BLUE), (1250, VGREEN), (1100, WHITE), (1000, VYELLOW), (900, VORANGE), (800, VRED), (700, BLACK)],
+        "CB":      [(1500, BLUE), (1450, VGREEN), (1300, WHITE), (1200, VYELLOW), (1100, VORANGE), (1000, VRED), (900, BLACK)],
+        "DM":      [(1400, BLUE), (1350, VGREEN), (1200, WHITE), (1100, VYELLOW), (1000, VORANGE), (900, VRED), (800, BLACK)],
+        "AML/AMR": [(1500, BLUE), (1450, VGREEN), (1300, WHITE), (1200, VYELLOW), (1100, VORANGE), (1000, VRED), (900, BLACK)],
+        "AMC":     [(1500, BLUE), (1450, VGREEN), (1300, WHITE), (1200, VYELLOW), (1100, VORANGE), (1000, VRED), (900, BLACK)],
+        "ST":      [(1700, BLUE), (1650, VGREEN), (1450, WHITE), (1300, VYELLOW), (1200, VORANGE), (1100, VRED), (1000, BLACK)]
+    }
+
+    def get_role_color(role_key, score):
+        """Return CSS 'rgb(...)' color string for the given role and numeric score.
+           Interpolates smoothly between adjacent colour stops when score falls between thresholds.
+        """
+        rk = role_key
+
+        # Normalize some common role labels to the names used in thresholds
+        if rk in {"RB", "LB"}:
+            rk = "DL/DR"
+        if rk in {"AMR", "AML"}:
+            rk = "AML/AMR"
+
+        thresholds = ROLE_THRESHOLDS.get(rk)
+        if not thresholds:
+            return _rgb_to_css(WHITE)
+
+        # Ensure thresholds are sorted descending by value
+        thresholds_sorted = sorted(thresholds, key=lambda x: x[0], reverse=True)
+
+        top_val, top_col = thresholds_sorted[0]
+        bot_val, bot_col = thresholds_sorted[-1]
+
+        if score >= top_val:
+            return _rgb_to_css(top_col)
+        if score <= bot_val:
+            return _rgb_to_css(bot_col)
+
+        # find interval where v_low <= score <= v_high and interpolate
+        for i in range(len(thresholds_sorted) - 1):
+            v_high, c_high = thresholds_sorted[i]
+            v_low,  c_low  = thresholds_sorted[i + 1]
+            if v_low <= score <= v_high:
+                if v_high == v_low:
+                    t = 0.0
+                else:
+                    t = (score - v_low) / (v_high - v_low)
+                rgb = _lerp_color(c_low, c_high, t)
+                return _rgb_to_css(rgb)
+
+        return _rgb_to_css(WHITE)
+    # --- end role-specific color helpers ---
 
 # Format as table
     lines = [f"<div class='xi-formation'>"]
@@ -683,24 +755,9 @@ def render_xi(chosen_map, team_name="Team"):
         else:
             sel_score_int = int(round(sel_score))
             
-            # Calculate color based on difference from team average
-            diff_from_avg = sel_score - team_avg
-            
-            # Normalize difference to a 0-1 scale (400 points = full intensity)
-            intensity = min(abs(diff_from_avg) / 400.0, 1.0)
-            
-            # Calculate RGB values
-            if diff_from_avg >= 0:  # Above average - green
-                red = int(255 * (1 - intensity))
-                green = 255
-                blue = int(255 * (1 - intensity))
-            else:  # Below average - red
-                red = 255
-                green = int(255 * (1 - intensity))
-                blue = int(255 * (1 - intensity))
-            
-            name_color = f"rgb({red}, {green}, {blue})"
-            
+            # Use role-specific threshold coloring (with interpolation)
+            name_color = get_role_color(role_key, float(sel_score))
+
             lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
                 <span style='font-weight: bold; min-width: 5rem; color: {name_color};'>{pos_label}</span>
                 <span style='font-weight: bold; flex-grow: 1; text-align: center; color: {name_color};'>{name}</span>
@@ -732,3 +789,4 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
