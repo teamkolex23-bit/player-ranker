@@ -547,29 +547,6 @@ with st.sidebar:
     if st.session_state.last_upload_time:
         upload_time = time.strftime("%H:%M:%S", time.localtime(st.session_state.last_upload_time))
         st.caption(f"Last upload: {upload_time}")
-    
-    # Memory usage indicator
-    if st.button("💾 Memory Usage", help="Check current memory usage"):
-        try:
-            import psutil
-            memory = psutil.virtual_memory()
-            st.info(f"Memory: {memory.percent}% used ({memory.used // (1024**2)} MB)")
-        except ImportError:
-            st.warning("Memory monitoring requires 'psutil' package. Install with: pip install psutil")
-        except Exception as e:
-            st.error(f"Error checking memory: {str(e)}")
-    
-    # Analysis info
-    st.markdown("### Analysis Info")
-    st.info("""
-    **Position Weights Score**: From FMScout (IMO still accurate even if outdated unlike the FM-Arena attribute testing)
-
-    **Scoring**: Higher scores means better fit in that position. Some positions are just naturally inflated for every player.
-
-    **Deduplication**: Keeps the best version of duplicate entries.
-    
-    **Performance**: Data is cached for faster loading. Use "Clear Cache" if you need fresh calculations.
-    """)
 
 
 # Create tabs for different views with user preference
