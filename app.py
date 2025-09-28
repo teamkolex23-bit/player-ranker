@@ -81,7 +81,7 @@ st.markdown("""
     border-radius: 10px;
     color: white;
     font-family: monospace;
-    border: 3px solid #3c4b5a;
+    border: 3px solid #3c4b5aa;
     min-height: 500px;
 }
     .stProgress .st-bo {
@@ -380,9 +380,25 @@ def deduplicate_players(df):
     df['_name_key'] = df['Name'].apply(create_name_key)
     df['_transfer_val_numeric'] = df.get('Transfer Value', '').apply(parse_transfer_value)
 
-    df_sorted = df.sort_values(['Score', '_transfer_val_numeric'], ascending=[False, False])
+    # Calculate average score across all roles for deduplication
+    available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
+    if available_attrs:
+        attrs_df = df[available_attrs].fillna(0).astype(float)
+        avg_scores = []
+        for _, player in attrs_df.iterrows():
+            player_scores = []
+            for role, weights in WEIGHTS_BY_ROLE.items():
+                w = pd.Series({a: float(weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+                score = player.values.dot(w.values.astype(float))
+                player_scores.append(score)
+            avg_scores.append(np.mean(player_scores))
+        df['_avg_score'] = avg_scores
+    else:
+        df['_avg_score'] = 0
+
+    df_sorted = df.sort_values(['_avg_score', '_transfer_val_numeric'], ascending=[False, False])
     df_deduped = df_sorted.drop_duplicates(subset=['_name_key'], keep='first')
-    df_deduped = df_deduped.drop(columns=['_name_key', '_transfer_val_numeric'])
+    df_deduped = df_deduped.drop(columns=['_name_key', '_transfer_val_numeric', '_avg_score'])
 
     duplicates_removed = len(df) - len(df_deduped)
     if duplicates_removed > 0:
@@ -392,15 +408,6 @@ def deduplicate_players(df):
 
 # Sidebar Configuration
 with st.sidebar:
-    # Role selection
-    ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-    role = st.selectbox(
-        "Choose Position to display score for",
-        ROLE_OPTIONS,
-        index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
-        help="Not necessary since I also include a top 10 for every position"
-    )
-
     # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
@@ -426,7 +433,6 @@ uploaded_files = st.file_uploader(
     type=["html", "htm"],
     accept_multiple_files=True
 )
-
 
 if not uploaded_files:
     st.stop()
@@ -480,69 +486,40 @@ if not available_attrs:
     st.error("❌ No matching attribute columns found. Detected columns: " + ", ".join(list(df.columns)))
     st.stop()
 
-# Calculate scores and deduplicate
-attrs_df = df[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df
-
-selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-
-scores = attrs_norm.values.dot(weights.values.astype(float))
-df['Score'] = scores
-
+# Deduplicate players first
 df_final = deduplicate_players(df)
-df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
 
-# Main Rankings with enhanced display
-st.markdown(f"## All players score as a {role}")
+# Calculate scores for all roles
+attrs_df_final = df_final[available_attrs].fillna(0).astype(float)
+attrs_norm_final = attrs_df_final
 
-ranked = df_sorted.copy()
-ranked.insert(0, "Rank", range(1, len(ranked) + 1))
+# Calculate scores for each role
+role_scores = {}
+for role, weights in WEIGHTS_BY_ROLE.items():
+    w = pd.Series({a: float(weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+    scores = attrs_norm_final.values.dot(w.values.astype(float))
+    role_scores[role] = scores
 
-# Enhanced dataframe display
-cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
+# Create the new comprehensive table
+comprehensive_data = {
+    'Rank': range(1, len(df_final) + 1),
+    'Name': df_final['Name'],
+    'Age': df_final.get('Age', 'N/A')
+}
 
-display_df = ranked
+# Add scores for each role
+for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']:
+    comprehensive_data[role] = role_scores[role].round(0).astype('Int64')
 
+comprehensive_df = pd.DataFrame(comprehensive_data)
+
+# Display the comprehensive table
+st.markdown("## Player Rankings by Position")
 st.dataframe(
-    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
+    comprehensive_df,
     use_container_width=True,
     height=400
 )
-
-# Compact Role Analysis
-st.markdown("## Top 10 in each position")
-
-# Role analysis without tabs
-available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
-attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
-attrs_norm_final = attrs_df_final
-
-roles_per_row = 4
-for i in range(0, len(ROLE_OPTIONS), roles_per_row):
-    cols = st.columns(roles_per_row)
-    for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
-        with cols[j]:
-            st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
-
-            rw = WEIGHTS_BY_ROLE.get(r, {})
-            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
-            sc = attrs_norm_final.values.dot(w.values.astype(float))
-
-            tmp = df_final.copy()
-            tmp["Score"] = sc
-            tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
-            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
-
-            display_cols = ["Rank", "Name", "Score"]
-            if "Age" in tmp_sorted.columns:
-                display_cols.insert(-1, "Age")
-
-            tiny = tmp_sorted[display_cols].copy()
-            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-
-            st.dataframe(tiny, hide_index=True, use_container_width=True)
-
 
 # Starting XI Section
 st.markdown("""
@@ -586,12 +563,12 @@ role_weight_vectors = {}
 for _, role_key in positions:
     if role_key not in role_weight_vectors: # Avoid re-computing for same role
         rw = WEIGHTS_BY_ROLE.get(role_key, {})
-        role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs_final], dtype=float)
+        role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
 
 # Compute score matrix
 score_matrix = np.zeros((n_players, n_positions), dtype=float)
 for i_idx in range(n_players):
-    player_attr_vals = attrs_norm_final.iloc[i_idx].values if len(available_attrs_final) > 0 else np.zeros((len(available_attrs_final),), dtype=float)
+    player_attr_vals = attrs_norm_final.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
     for p_idx, (_, role_key) in enumerate(positions):
         w = role_weight_vectors[role_key]
         score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
