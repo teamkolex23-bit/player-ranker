@@ -775,69 +775,130 @@ with tab1:
         
         st.markdown("---")
     
-    # Simple color-coded table with better performance
+    # Custom HTML table with colors for better performance
     def get_score_color(val, role):
         """Get color for score based on role thresholds"""
         if pd.isna(val) or val == 0:
             return '#666666'
         
-        # Simplified thresholds for better performance
         if role == "GK":
-            if val >= 1600: return '#00ffff'
-            elif val >= 1550: return '#00ff00'
-            elif val >= 1400: return '#ffffff'
-            elif val >= 1300: return '#ffff00'
-            elif val >= 1200: return '#ffa500'
-            elif val >= 1100: return '#ff0000'
-            else: return '#000000'
+            if val >= 1600: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1550: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1400: return '#ffffff'             # WHITE
+            elif val >= 1300: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 1200: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
+            elif val >= 1100: return 'rgb(255, 0, 0)'      # VIBRANT RED
+            else: return '#000000'                         # BLACK
+        elif role == "DL/DR":
+            if val >= 1300: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1250: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1100: return '#ffffff'             # WHITE
+            elif val >= 1000: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 900: return 'rgb(255, 150, 0)'     # VIBRANT ORANGE
+            elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
+            else: return '#000000'                         # BLACK
         elif role == "CB":
-            if val >= 1500: return '#00ffff'
-            elif val >= 1450: return '#00ff00'
-            elif val >= 1300: return '#ffffff'
-            elif val >= 1200: return '#ffff00'
-            elif val >= 1100: return '#ffa500'
-            elif val >= 1000: return '#ff0000'
-            else: return '#000000'
+            if val >= 1500: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1450: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1300: return '#ffffff'             # WHITE
+            elif val >= 1200: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 1100: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
+            elif val >= 1000: return 'rgb(255, 0, 0)'      # VIBRANT RED
+            else: return '#000000'                         # BLACK
+        elif role == "DM":
+            if val >= 1400: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1350: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1200: return '#ffffff'             # WHITE
+            elif val >= 1100: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 1000: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
+            elif val >= 900: return 'rgb(255, 0, 0)'       # VIBRANT RED
+            else: return '#000000'                         # BLACK
+        elif role in ["AML/AMR", "AMC"]:
+            if val >= 1500: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1450: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1300: return '#ffffff'             # WHITE
+            elif val >= 1200: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 1100: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
+            elif val >= 1000: return 'rgb(255, 0, 0)'      # VIBRANT RED
+            else: return '#000000'                         # BLACK
         elif role == "ST":
-            if val >= 1700: return '#00ffff'
-            elif val >= 1650: return '#00ff00'
-            elif val >= 1450: return '#ffffff'
-            elif val >= 1300: return '#ffff00'
-            elif val >= 1200: return '#ffa500'
-            elif val >= 1100: return '#ff0000'
-            else: return '#000000'
-        else:  # All other positions
-            if val >= 1300: return '#00ffff'
-            elif val >= 1250: return '#00ff00'
-            elif val >= 1100: return '#ffffff'
-            elif val >= 1000: return '#ffff00'
-            elif val >= 900: return '#ffa500'
-            elif val >= 800: return '#ff0000'
-            else: return '#000000'
+            if val >= 1700: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1650: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1450: return '#ffffff'             # WHITE
+            elif val >= 1300: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 1200: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
+            elif val >= 1100: return 'rgb(255, 0, 0)'      # VIBRANT RED
+            else: return '#000000'                         # BLACK
+        else:  # WBL/WBR, ML/MR, CM (use DL/DR thresholds)
+            if val >= 1300: return 'rgb(0, 255, 255)'      # BLUE
+            elif val >= 1250: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
+            elif val >= 1100: return '#ffffff'             # WHITE
+            elif val >= 1000: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
+            elif val >= 900: return 'rgb(255, 150, 0)'     # VIBRANT ORANGE
+            elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
+            else: return '#000000'                         # BLACK
     
-    # Create a copy for styling
-    display_df = comprehensive_df.copy()
+    # Create HTML table
+    def create_colored_table(df):
+        html = """
+        <style>
+        .player-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: monospace;
+            font-size: 14px;
+            background: #1f2c38;
+            color: #fafafa;
+        }
+        .player-table th {
+            background: #2e4a5a;
+            color: #fafafa;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #3c4b5a;
+            font-weight: bold;
+        }
+        .player-table td {
+            padding: 6px 8px;
+            text-align: center;
+            border: 1px solid #3c4b5a;
+        }
+        .player-table tr:nth-child(even) {
+            background: #1a252f;
+        }
+        .player-table tr:hover {
+            background: #2a3a4a;
+        }
+        </style>
+        <table class="player-table">
+        <thead>
+            <tr>
+        """
+        
+        # Add headers
+        for col in df.columns:
+            html += f"<th>{col}</th>"
+        html += "</tr></thead><tbody>"
+        
+        # Add rows
+        role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
+        
+        for _, row in df.iterrows():
+            html += "<tr>"
+            for col in df.columns:
+                if col in role_columns:
+                    val = row[col]
+                    color = get_score_color(val, col)
+                    html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
+                else:
+                    html += f"<td>{row[col]}</td>"
+            html += "</tr>"
+        
+        html += "</tbody></table>"
+        return html
     
-    # Apply colors to role columns
-    role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
-    
-    # Use simpler styling approach
-    styled_df = comprehensive_df.style
-    
-    # Apply color coding more efficiently
-    for role in role_columns:
-        if role in comprehensive_df.columns:
-            styled_df = styled_df.apply(
-                lambda x: [f'color: {get_score_color(val, role)}; font-weight: bold' for val in x],
-                subset=[role]
-            )
-    
-    # Display with optimized settings
-    st.dataframe(
-        styled_df,
-        use_container_width=True,
-        height=400
-    )
+    # Display the colored HTML table
+    st.markdown(create_colored_table(comprehensive_df), unsafe_allow_html=True)
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
