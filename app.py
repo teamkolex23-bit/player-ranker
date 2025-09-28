@@ -888,8 +888,7 @@ with tab1:
             elif col == "ST":
                 display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
     
-    # Use Streamlit's native dataframe - it's sortable by default
-    # We'll add custom CSS to color the text after the table is rendered
+    # Use st.dataframe with custom CSS for colors
     st.dataframe(
         comprehensive_df,
         use_container_width=True,
@@ -899,124 +898,135 @@ with tab1:
     # Add custom CSS to color the table cells
     st.markdown("""
     <style>
-    /* Target the Streamlit dataframe and color the cells */
-    .stDataFrame {
-        font-family: monospace;
+    /* Target Streamlit dataframe cells and apply colors */
+    div[data-testid="stDataFrame"] table tbody tr td {
+        font-family: monospace !important;
     }
     
-    /* This is a workaround - we'll use JavaScript to color the cells */
+    /* Apply colors to specific cells based on their content and column */
+    div[data-testid="stDataFrame"] table tbody tr td:nth-child(2) {
+        /* GK column - adjust nth-child number based on actual column position */
+    }
     </style>
     
     <script>
-    // Wait for the table to load, then apply colors
-    setTimeout(function() {
-        const tables = document.querySelectorAll('.stDataFrame table');
-        if (tables.length > 0) {
-            const table = tables[0];
-            const rows = table.querySelectorAll('tbody tr');
+    // Function to apply colors after table loads
+    function applyColors() {
+        const dataframe = document.querySelector('[data-testid="stDataFrame"]');
+        if (!dataframe) return;
+        
+        const table = dataframe.querySelector('table');
+        if (!table) return;
+        
+        const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+        const rows = table.querySelectorAll('tbody tr');
+        
+        // Find column indices
+        const roleColumns = ['GK', 'DL/DR', 'CB', 'DM', 'AML/AMR', 'AMC', 'ST'];
+        const emptyCellColumns = ['WBL/WBR', 'ML/MR', 'CM'];
+        
+        const columnIndices = {};
+        roleColumns.forEach(role => {
+            const index = headers.indexOf(role);
+            if (index !== -1) columnIndices[role] = index;
+        });
+        emptyCellColumns.forEach(role => {
+            const index = headers.indexOf(role);
+            if (index !== -1) columnIndices[role] = index;
+        });
+        
+        rows.forEach(row => {
+            const cells = Array.from(row.querySelectorAll('td'));
             
-            // Define role columns and their thresholds
-            const roleColumns = ['GK', 'DL/DR', 'CB', 'DM', 'AML/AMR', 'AMC', 'ST'];
-            const emptyCellColumns = ['WBL/WBR', 'ML/MR', 'CM'];
-            
-            // Get column indices
-            const headers = table.querySelectorAll('thead th');
-            const columnMap = {};
-            headers.forEach((header, index) => {
-                columnMap[header.textContent.trim()] = index;
-            });
-            
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                
-                // Apply colors to role columns
-                roleColumns.forEach(role => {
-                    const colIndex = columnMap[role];
-                    if (colIndex !== undefined) {
-                        const cell = cells[colIndex];
-                        const val = parseFloat(cell.textContent);
+            // Apply colors to role columns
+            Object.entries(columnIndices).forEach(([role, colIndex]) => {
+                if (colIndex < cells.length) {
+                    const cell = cells[colIndex];
+                    const val = parseFloat(cell.textContent);
+                    
+                    if (!isNaN(val) && val > 0) {
+                        let color = '';
                         
-                        if (!isNaN(val) && val > 0) {
-                            let color = '';
-                            
-                            // Apply color based on role and value
-                            if (role === 'GK') {
-                                if (val >= 1600) color = 'rgb(0, 255, 255)';
-                                else if (val >= 1550) color = 'rgb(0, 255, 0)';
-                                else if (val >= 1400) color = '#ffffff';
-                                else if (val >= 1300) color = 'rgb(255, 255, 0)';
-                                else if (val >= 1200) color = 'rgb(255, 150, 0)';
-                                else if (val >= 1100) color = 'rgb(255, 0, 0)';
-                                else if (val < 1000) color = 'transparent';
-                            } else if (role === 'DL/DR') {
-                                if (val >= 1300) color = 'rgb(0, 255, 255)';
-                                else if (val >= 1250) color = 'rgb(0, 255, 0)';
-                                else if (val >= 1100) color = '#ffffff';
-                                else if (val >= 1000) color = 'rgb(255, 255, 0)';
-                                else if (val >= 900) color = 'rgb(255, 150, 0)';
-                                else if (val >= 800) color = 'rgb(255, 0, 0)';
-                                else if (val < 700) color = 'transparent';
-                            } else if (role === 'CB') {
-                                if (val >= 1500) color = 'rgb(0, 255, 255)';
-                                else if (val >= 1450) color = 'rgb(0, 255, 0)';
-                                else if (val >= 1300) color = '#ffffff';
-                                else if (val >= 1200) color = 'rgb(255, 255, 0)';
-                                else if (val >= 1100) color = 'rgb(255, 150, 0)';
-                                else if (val >= 1000) color = 'rgb(255, 0, 0)';
-                                else if (val < 900) color = 'transparent';
-                            } else if (role === 'DM') {
-                                if (val >= 1400) color = 'rgb(0, 255, 255)';
-                                else if (val >= 1350) color = 'rgb(0, 255, 0)';
-                                else if (val >= 1200) color = '#ffffff';
-                                else if (val >= 1100) color = 'rgb(255, 255, 0)';
-                                else if (val >= 1000) color = 'rgb(255, 150, 0)';
-                                else if (val >= 900) color = 'rgb(255, 0, 0)';
-                                else if (val < 800) color = 'transparent';
-                            } else if (role === 'AML/AMR' || role === 'AMC') {
-                                if (val >= 1500) color = 'rgb(0, 255, 255)';
-                                else if (val >= 1450) color = 'rgb(0, 255, 0)';
-                                else if (val >= 1300) color = '#ffffff';
-                                else if (val >= 1200) color = 'rgb(255, 255, 0)';
-                                else if (val >= 1100) color = 'rgb(255, 150, 0)';
-                                else if (val >= 1000) color = 'rgb(255, 0, 0)';
-                                else if (val < 900) color = 'transparent';
-                            } else if (role === 'ST') {
-                                if (val >= 1700) color = 'rgb(0, 255, 255)';
-                                else if (val >= 1650) color = 'rgb(0, 255, 0)';
-                                else if (val >= 1450) color = '#ffffff';
-                                else if (val >= 1300) color = 'rgb(255, 255, 0)';
-                                else if (val >= 1200) color = 'rgb(255, 150, 0)';
-                                else if (val >= 1100) color = 'rgb(255, 0, 0)';
-                                else if (val < 1000) color = 'transparent';
-                            }
-                            
-                            if (color) {
-                                cell.style.color = color;
-                                cell.style.fontWeight = 'bold';
-                            }
+                        if (role === 'GK') {
+                            if (val >= 1600) color = 'rgb(0, 255, 255)';
+                            else if (val >= 1550) color = 'rgb(0, 255, 0)';
+                            else if (val >= 1400) color = '#ffffff';
+                            else if (val >= 1300) color = 'rgb(255, 255, 0)';
+                            else if (val >= 1200) color = 'rgb(255, 150, 0)';
+                            else if (val >= 1100) color = 'rgb(255, 0, 0)';
+                            else if (val < 1000) color = 'transparent';
+                        } else if (role === 'DL/DR') {
+                            if (val >= 1300) color = 'rgb(0, 255, 255)';
+                            else if (val >= 1250) color = 'rgb(0, 255, 0)';
+                            else if (val >= 1100) color = '#ffffff';
+                            else if (val >= 1000) color = 'rgb(255, 255, 0)';
+                            else if (val >= 900) color = 'rgb(255, 150, 0)';
+                            else if (val >= 800) color = 'rgb(255, 0, 0)';
+                            else if (val < 700) color = 'transparent';
+                        } else if (role === 'CB') {
+                            if (val >= 1500) color = 'rgb(0, 255, 255)';
+                            else if (val >= 1450) color = 'rgb(0, 255, 0)';
+                            else if (val >= 1300) color = '#ffffff';
+                            else if (val >= 1200) color = 'rgb(255, 255, 0)';
+                            else if (val >= 1100) color = 'rgb(255, 150, 0)';
+                            else if (val >= 1000) color = 'rgb(255, 0, 0)';
+                            else if (val < 900) color = 'transparent';
+                        } else if (role === 'DM') {
+                            if (val >= 1400) color = 'rgb(0, 255, 255)';
+                            else if (val >= 1350) color = 'rgb(0, 255, 0)';
+                            else if (val >= 1200) color = '#ffffff';
+                            else if (val >= 1100) color = 'rgb(255, 255, 0)';
+                            else if (val >= 1000) color = 'rgb(255, 150, 0)';
+                            else if (val >= 900) color = 'rgb(255, 0, 0)';
+                            else if (val < 800) color = 'transparent';
+                        } else if (role === 'AML/AMR' || role === 'AMC') {
+                            if (val >= 1500) color = 'rgb(0, 255, 255)';
+                            else if (val >= 1450) color = 'rgb(0, 255, 0)';
+                            else if (val >= 1300) color = '#ffffff';
+                            else if (val >= 1200) color = 'rgb(255, 255, 0)';
+                            else if (val >= 1100) color = 'rgb(255, 150, 0)';
+                            else if (val >= 1000) color = 'rgb(255, 0, 0)';
+                            else if (val < 900) color = 'transparent';
+                        } else if (role === 'ST') {
+                            if (val >= 1700) color = 'rgb(0, 255, 255)';
+                            else if (val >= 1650) color = 'rgb(0, 255, 0)';
+                            else if (val >= 1450) color = '#ffffff';
+                            else if (val >= 1300) color = 'rgb(255, 255, 0)';
+                            else if (val >= 1200) color = 'rgb(255, 150, 0)';
+                            else if (val >= 1100) color = 'rgb(255, 0, 0)';
+                            else if (val < 1000) color = 'transparent';
+                        } else if (role === 'WBL/WBR' || role === 'ML/MR') {
+                            if (val < 700) color = 'transparent';
+                        } else if (role === 'CM') {
+                            if (val < 800) color = 'transparent';
+                        }
+                        
+                        if (color) {
+                            cell.style.color = color;
+                            cell.style.fontWeight = 'bold';
                         }
                     }
-                });
-                
-                // Apply empty cell logic to other columns
-                emptyCellColumns.forEach(role => {
-                    const colIndex = columnMap[role];
-                    if (colIndex !== undefined) {
-                        const cell = cells[colIndex];
-                        const val = parseFloat(cell.textContent);
-                        
-                        if (!isNaN(val) && val > 0) {
-                            if ((role === 'WBL/WBR' || role === 'ML/MR') && val < 700) {
-                                cell.style.color = 'transparent';
-                            } else if (role === 'CM' && val < 800) {
-                                cell.style.color = 'transparent';
-                            }
-                        }
-                    }
-                });
+                }
             });
-        }
-    }, 1000); // Wait 1 second for the table to render
+        });
+    }
+    
+    // Apply colors when page loads
+    setTimeout(applyColors, 500);
+    
+    // Reapply colors when table updates (for sorting)
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                setTimeout(applyColors, 100);
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
     </script>
     """, unsafe_allow_html=True)
 
