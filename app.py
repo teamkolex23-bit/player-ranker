@@ -997,19 +997,19 @@ with tab1:
         if col in display_df.columns:
             # Convert empty strings to NaN for sorting
             sort_df[col] = pd.to_numeric(sort_df[col], errors='coerce')
+            # Replace NaN with empty string for display
+            sort_df[col] = sort_df[col].fillna('')
             
-            # Format display values as integers without decimals
-            display_df[col] = display_df[col].apply(lambda x: 
-                f"{int(float(x))}" if pd.notna(x) and x != '' else '')
+            # Format non-empty values as integers
+            sort_df[col] = sort_df[col].apply(lambda x: 
+                f"{int(x)}" if pd.notna(x) and x != '' else '')
     
-    # Apply styling
-    styled_df = display_df.style.apply(lambda _: style_df(display_df), axis=None)
+    # Apply styling to the sorting dataframe
+    styled_df = sort_df.style.apply(lambda _: style_df(sort_df), axis=None)
     
     # Display with sorting enabled
     st.dataframe(
-        data=sort_df,
-        column_config={col: st.column_config.NumberColumn(format="%d") 
-                      for col in numeric_columns if col in sort_df.columns},
+        styled_df,
         use_container_width=True,
         height=400,
         hide_index=True
