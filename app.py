@@ -900,15 +900,15 @@ with tab1:
     if 'CM' in display_df.columns:
         display_df['CM'] = display_df['CM'].apply(lambda x: '' if pd.notna(x) and float(x) < 800 else x)
     
-    # Handle colored positions with black zones
+    # Handle colored positions with black zones (everything under red threshold)
     black_zone_thresholds = {
-        'GK': 1000,
-        'DL/DR': 700,
-        'CB': 900,
-        'DM': 800,
-        'AML/AMR': 900,
-        'AMC': 900,
-        'ST': 1000
+        'GK': 1100,      # Hide < 1100 (under red)
+        'DL/DR': 800,    # Hide < 800 (under red)
+        'CB': 1000,      # Hide < 1000 (under red)
+        'DM': 900,       # Hide < 900 (under red)
+        'AML/AMR': 1000, # Hide < 1000 (under red)
+        'AMC': 1000,     # Hide < 1000 (under red)
+        'ST': 1100       # Hide < 1100 (under red)
     }
     
     for col, threshold in black_zone_thresholds.items():
@@ -932,7 +932,7 @@ with tab1:
                     elif val_float >= 1300: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
                     elif val_float >= 1200: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
                     elif val_float >= 1100: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
-                    else: return ''                                             # BLACK (1000 AND BELOW)
+                    else: return ''                                             # Hide < 1100 (under red)
                 elif col == 'DL/DR':
                     if val_float >= 1300: return 'color: rgb(0, 255, 255)'      # BLUE
                     elif val_float >= 1250: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -940,7 +940,7 @@ with tab1:
                     elif val_float >= 1000: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
                     elif val_float >= 900: return 'color: rgb(255, 150, 0)'     # VIBRANT ORANGE
                     elif val_float >= 800: return 'color: rgb(255, 0, 0)'       # VIBRANT RED
-                    else: return ''                                             # BLACK (700 AND BELOW)
+                    else: return ''                                             # Hide < 800 (under red)
                 elif col == 'CB':
                     if val_float >= 1500: return 'color: rgb(0, 255, 255)'      # BLUE
                     elif val_float >= 1450: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -948,7 +948,7 @@ with tab1:
                     elif val_float >= 1200: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
                     elif val_float >= 1100: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
                     elif val_float >= 1000: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
-                    else: return ''                                             # BLACK (900 AND BELOW)
+                    else: return ''                                             # Hide < 1000 (under red)
                 elif col == 'DM':
                     if val_float >= 1400: return 'color: rgb(0, 255, 255)'      # BLUE
                     elif val_float >= 1350: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -956,7 +956,7 @@ with tab1:
                     elif val_float >= 1100: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
                     elif val_float >= 1000: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
                     elif val_float >= 900: return 'color: rgb(255, 0, 0)'       # VIBRANT RED
-                    else: return ''                                             # BLACK (800 AND BELOW)
+                    else: return ''                                             # Hide < 900 (under red)
                 elif col in ['AML/AMR', 'AMC']:
                     if val_float >= 1500: return 'color: rgb(0, 255, 255)'      # BLUE
                     elif val_float >= 1450: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -964,7 +964,7 @@ with tab1:
                     elif val_float >= 1200: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
                     elif val_float >= 1100: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
                     elif val_float >= 1000: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
-                    else: return ''                                             # BLACK (900 AND BELOW)
+                    else: return ''                                             # Hide < 1000 (under red)
                 elif col == 'ST':
                     if val_float >= 1700: return 'color: rgb(0, 255, 255)'      # BLUE
                     elif val_float >= 1650: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -972,7 +972,7 @@ with tab1:
                     elif val_float >= 1300: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
                     elif val_float >= 1200: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
                     elif val_float >= 1100: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
-                    else: return ''                                             # BLACK (1000 AND BELOW)
+                    else: return ''                                             # Hide < 1100 (under red)
             except (ValueError, TypeError):
                 return ''
             return ''
