@@ -14,200 +14,88 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Dynamic CSS based on theme settings
-def get_theme_css(light_mode, colorblind_mode):
-    if light_mode:
-        base_bg = "#ffffff"
-        card_bg = "#f8f9fa"
-        text_color = "#212529"
-        header_gradient = "linear-gradient(90deg, #007bff, #28a745)"
-        info_bg = "#e3f2fd"
-        info_border = "#2196f3"
-        metric_border = "#dee2e6"
-        formation_bg = "#f8f9fa"
-        formation_border = "#dee2e6"
-        formation_text = "#212529"
-    else:
-        base_bg = "#0e1117"
-        card_bg = "#1f2c38"
-        text_color = "#fafafa"
-        header_gradient = "linear-gradient(90deg, #1f4e79, #2e8b57)"
-        info_bg = "#1a3a5a"
-        info_border = "#4169e1"
-        metric_border = "#3c4b5a"
-        formation_bg = "#1f2c38"
-        formation_border = "#3c4b5a"
-        formation_text = "white"
-    
-    # Color blind friendly colors
-    if colorblind_mode:
-        if light_mode:
-            blue_color = "#1f77b4"      # Blue
-            green_color = "#2ca02c"     # Green
-            purple_color = "#9467bd"    # Purple
-            orange_color = "#ff7f0e"    # Orange
-        else:
-            blue_color = "#66b2ff"      # Light Blue
-            green_color = "#76ff7a"     # Light Green
-            purple_color = "#c792ea"    # Light Purple
-            orange_color = "#ffcb6b"    # Light Orange
-    else:
-        if light_mode:
-            blue_color = "#007bff"
-            green_color = "#28a745"
-            purple_color = "#6f42c1"
-            orange_color = "#fd7e14"
-        else:
-            blue_color = "#66b2ff"
-            green_color = "#76ff7a"
-            purple_color = "#c792ea"
-            orange_color = "#ffcb6b"
-    
-    return f"""
-    <style>
-        /* Base styles */
-        body {{
-            color: {text_color};
-            background-color: {base_bg};
-        }}
-        .main-header {{
-            background: {header_gradient};
-            padding: 2rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            text-align: center;
-            color: white;
-        }}
-        .main-header h1 {{
-            color: white;
-            margin: 0;
-            font-size: 2.5rem;
-            font-weight: bold;
-        }}
-        /* Card styles */
-        .section-card {{
-            background: {card_bg};
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #1f4e79;
-            color: {text_color};
-        }}
-        .info-box {{
-            background: {info_bg};
-            padding: 1rem;
-            border-radius: 8px;
-            border-left: 4px solid {info_border};
-            margin-bottom: 1rem;
-            color: {text_color};
-        }}
-        .metric-card {{
-            background: {card_bg};
-            padding: 1rem;
-            border-radius: 8px;
-            text-align: center;
-            border: 2px solid {metric_border};
-            color: {text_color};
-        }}
-        /* Header colors for metric cards */
-        .metric-card h3.blue {{ color: {blue_color}; }}
-        .metric-card h3.green {{ color: {green_color}; }}
-        .metric-card h3.purple {{ color: {purple_color}; }}
-        .metric-card h3.orange {{ color: {orange_color}; }}
+# Custom CSS for better styling and a dark theme focus
+st.markdown("""
+<style>
+    /* Base styles for dark theme */
+    body {
+        color: #fafafa;
+    }
+    .main-header {
+        background: linear-gradient(90deg, #1f4e79, #2e8b57);
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        text-align: center;
+        color: white;
+    }
+    .main-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    /* Updated card styles for dark theme */
+    .section-card {
+        background: #1f2c38; /* Darker background */
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #1f4e79;
+        color: #fafafa; /* Light text */
+    }
+    .info-box {
+        background: #1a3a5a; /* Darker info box */
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #4169e1;
+        margin-bottom: 1rem;
+        color: #fafafa;
+    }
+    .metric-card {
+        background: #1f2c38; /* Darker metric card */
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        border: 2px solid #3c4b5a;
+        color: #fafafa;
+    }
+    /* Brighter header colors for metric cards */
+    .metric-card h3.blue { color: #66b2ff; }
+    .metric-card h3.green { color: #76ff7a; }
+    .metric-card h3.purple { color: #c792ea; }
+    .metric-card h3.orange { color: #ffcb6b; }
 
-        .role-header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }}
-        .xi-formation {{
-            background: {formation_bg};
-            padding: 2rem;
-            border-radius: 10px;
-            color: {formation_text};
-            font-family: monospace;
-            border: 3px solid {formation_border};
-            min-height: 500px;
-        }}
-        .stProgress .st-bo {{
-            background-color: #e8f4fd;
-        }}
-        .upload-section {{
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            padding: 2rem;
-            text-align: center;
-            background: {card_bg};
-        }}
-        /* Split UI styles */
-        .split-container {{
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }}
-        .split-panel {{
-            flex: 1;
-            background: {card_bg};
-            padding: 1.5rem;
-            border-radius: 10px;
-            border: 2px solid {metric_border};
-        }}
-        .split-panel h3 {{
-            margin-top: 0;
-            color: {text_color};
-        }}
-        /* Team builder styles */
-        .team-builder {{
-            background: {card_bg};
-            padding: 1.5rem;
-            border-radius: 10px;
-            border: 2px solid {metric_border};
-            margin-bottom: 2rem;
-        }}
-        .position-slot {{
-            background: {info_bg};
-            border: 2px dashed {info_border};
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 0.5rem;
-            min-height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }}
-        .position-slot:hover {{
-            background: {info_border};
-            color: white;
-        }}
-        .position-slot.occupied {{
-            background: {green_color};
-            border: 2px solid {green_color};
-            color: white;
-        }}
-        .player-card {{
-            background: {card_bg};
-            border: 1px solid {metric_border};
-            border-radius: 5px;
-            padding: 0.5rem;
-            margin: 0.25rem;
-            cursor: grab;
-            transition: all 0.3s ease;
-        }}
-        .player-card:hover {{
-            background: {info_bg};
-            transform: translateY(-2px);
-        }}
-        .player-card:active {{
-            cursor: grabbing;
-        }}
-    </style>
-    """
+    .role-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+.xi-formation {
+    background: #1f2c38;
+    padding: 2rem;
+    border-radius: 10px;
+    color: white;
+    font-family: monospace;
+    border: 3px solid #3c4b5a;
+    min-height: 500px;
+}
+    .stProgress .st-bo {
+        background-color: #e8f4fd;
+    }
+    .upload-section {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        background: #1f2c38;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Initialize session state for team building
 if 'custom_first_xi' not in st.session_state:
@@ -532,23 +420,8 @@ def deduplicate_players(df):
 
     return df_deduped.reset_index(drop=True)
 
-# Initialize theme settings
-if 'light_mode' not in st.session_state:
-    st.session_state.light_mode = False
-if 'colorblind_mode' not in st.session_state:
-    st.session_state.colorblind_mode = False
-
 # Sidebar Configuration
 with st.sidebar:
-    # Theme and Accessibility Settings
-    st.markdown("### Theme & Accessibility")
-    
-    # Light/Dark mode toggle
-    st.session_state.light_mode = st.toggle("🌞 Light Mode", value=st.session_state.light_mode, help="Switch to light mode for better energy conservation and accessibility")
-    
-    # Color blind toggle
-    st.session_state.colorblind_mode = st.toggle("🎨 Color Blind Friendly", value=st.session_state.colorblind_mode, help="Use color blind friendly color schemes")
-    
     # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
@@ -559,8 +432,6 @@ with st.sidebar:
     **Deduplication**: Keeps the best version of duplicate entries.
     """)
 
-# Apply theme CSS after sidebar configuration
-st.markdown(get_theme_css(st.session_state.light_mode, st.session_state.colorblind_mode), unsafe_allow_html=True)
 
 st.markdown("""
 <div class="info-box">
@@ -667,55 +538,38 @@ for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AM
 
 comprehensive_df = pd.DataFrame(comprehensive_data)
 
-# Split UI Layout
-st.markdown("## Player Rankings by Position")
+# Create tabs for different views
+tab1, tab2, tab3 = st.tabs(["📊 Full Table", "🤖 Automatic Teambuilder", "⚽ Custom Teambuilder"])
 
-# Toggle between split view and full view
-view_mode = st.radio("View Mode", ["Split View", "Full View"], horizontal=True)
-
-if view_mode == "Split View":
-    # Split the table into two columns
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### Goalkeepers & Defenders")
-        gk_def_df = comprehensive_df[['Rank', 'Name', 'Age', 'GK', 'DL/DR', 'CB', 'WBL/WBR']].copy()
-        st.dataframe(gk_def_df, use_container_width=True, height=400)
-    
-    with col2:
-        st.markdown("### Midfielders & Attackers")
-        mid_att_df = comprehensive_df[['Rank', 'Name', 'Age', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']].copy()
-        st.dataframe(mid_att_df, use_container_width=True, height=400)
-else:
-    # Full view
+with tab1:
+    st.markdown("## Player Rankings by Position")
     st.dataframe(
         comprehensive_df,
         use_container_width=True,
         height=400
     )
 
-# Starting XI Section
-st.markdown("""
-<div class="info-box">
-    <strong>Formation Analysis:</strong><br>
-    Hungarian algorithm used to create the best starting 11, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should theoretically be true as long as their hidden attributes aren't terrible.
-</div>
-""", unsafe_allow_html=True)
-
-# Team Builder Toggle
-st.markdown("### Team Builder Options")
-team_builder_mode = st.radio("Team Selection Mode", ["Auto (Hungarian Algorithm)", "Custom Team Builder"], horizontal=True)
-
-if team_builder_mode == "Custom Team Builder":
-    st.session_state.use_custom_teams = True
-    
-    # Custom Team Builder Interface
+with tab2:
+    st.markdown("## Automatic Teambuilder")
     st.markdown("""
-    <div class="team-builder">
-        <h3>Custom Team Builder</h3>
-        <p>Build your teams manually by selecting players for each position. Drag and drop or use the dropdowns to assign players.</p>
+    <div class="info-box">
+        <strong>Formation Analysis:</strong><br>
+        Hungarian algorithm used to create the best starting 11, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should theoretically be true as long as their hidden attributes aren't terrible.
     </div>
     """, unsafe_allow_html=True)
+    
+    st.session_state.use_custom_teams = False
+
+with tab3:
+    st.markdown("## Custom Teambuilder")
+    st.markdown("""
+    <div class="info-box">
+        <strong>Custom Team Builder:</strong><br>
+        Build your teams manually by selecting players for each position. Use the dropdowns to assign players to positions.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.session_state.use_custom_teams = True
     
     # Formation positions
     formation_positions = [
@@ -735,7 +589,6 @@ if team_builder_mode == "Custom Team Builder":
         
         for pos_label, role in formation_positions:
             # Get available players for this role (top 20 by score)
-            role_scores = role_scores[role]
             top_players = comprehensive_df.nlargest(20, role)[['Name', role]]
             
             # Create dropdown for player selection
@@ -754,7 +607,6 @@ if team_builder_mode == "Custom Team Builder":
         
         for pos_label, role in formation_positions:
             # Get available players for this role (top 20 by score)
-            role_scores = role_scores[role]
             top_players = comprehensive_df.nlargest(20, role)[['Name', role]]
             
             # Create dropdown for player selection
@@ -778,13 +630,7 @@ if team_builder_mode == "Custom Team Builder":
         second_xi_df = pd.DataFrame(list(st.session_state.custom_second_xi.items()), columns=['Position', 'Player'])
         st.dataframe(second_xi_df, use_container_width=True)
 
-else:
-    st.session_state.use_custom_teams = False
-
 # Fixed Formation Setup
-st.markdown("### Meta Formation (4-2-3-1)")
-
-# Fixed formation lines with your desired layout
 formation_lines = [
     ("GK", "GK"),
     ("EMPTY", "EMPTY"),
@@ -920,23 +766,14 @@ def render_xi(chosen_map, team_name="Team"):
     def _rgb_to_css(rgb):
         return f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
 
-    # Colour stops (RGB) - updated for color blind support
-    if st.session_state.colorblind_mode:
-        BLUE    = (31, 119, 180)    # Color blind friendly blue
-        VGREEN  = (44, 160, 44)     # Color blind friendly green
-        WHITE   = (255, 255, 255)
-        VYELLOW = (255, 127, 14)    # Color blind friendly orange
-        VORANGE = (255, 187, 120)   # Color blind friendly light orange
-        VRED    = (214, 39, 40)     # Color blind friendly red
-        BLACK   = (0, 0, 0)
-    else:
-        BLUE    = (0, 255, 255)
-        VGREEN  = (0, 255, 0)
-        WHITE   = (255, 255, 255)
-        VYELLOW = (255, 255, 0)
-        VORANGE = (255, 165, 0)
-        VRED    = (255, 0, 0)
-        BLACK   = (0, 0, 0)
+    # Colour stops (RGB)
+    BLUE    = (0, 255, 255)
+    VGREEN  = (0, 255, 0)
+    WHITE   = (255, 255, 255)
+    VYELLOW = (255, 255, 0)
+    VORANGE = (255, 165, 0)
+    VRED    = (255, 0, 0)
+    BLACK   = (0, 0, 0)
 
     ROLE_THRESHOLDS = {
         "GK":      [(1600, BLUE), (1550, VGREEN), (1400, WHITE), (1300, VYELLOW), (1200, VORANGE), (1100, VRED), (1000, BLACK)],
@@ -1016,56 +853,60 @@ def render_xi(chosen_map, team_name="Team"):
 
     return "".join(lines)
 
-# Generate teams based on selection mode
-if st.session_state.use_custom_teams and st.session_state.custom_first_xi:
-    # Use custom teams
-    first_choice = {}
-    second_choice = {}
+# Generate teams and display them in tabs
+with tab2:
+    st.markdown("### Meta Formation (4-2-3-1)")
     
-    # Convert custom selections to team format
-    formation_positions = [
-        ("GK", "GK"),
-        ("RB", "DL/DR"), ("CB1", "CB"), ("CB2", "CB"), ("LB", "DL/DR"),
-        ("DM1", "DM"), ("DM2", "DM"),
-        ("AMR", "AML/AMR"), ("AMC", "AMC"), ("AML", "AML/AMR"),
-        ("ST", "ST")
-    ]
-    
-    # Map custom selections to team indices
-    for i, (pos_label, role) in enumerate(formation_positions):
-        if pos_label in st.session_state.custom_first_xi:
-            player_name = st.session_state.custom_first_xi[pos_label]
-            # Find player index
-            player_idx = comprehensive_df[comprehensive_df['Name'] == player_name].index
-            if len(player_idx) > 0:
-                first_choice[i] = player_idx[0]
+    # Generate teams based on selection mode
+    if st.session_state.use_custom_teams and st.session_state.custom_first_xi:
+        # Use custom teams
+        first_choice = {}
+        second_choice = {}
         
-        if pos_label in st.session_state.custom_second_xi:
-            player_name = st.session_state.custom_second_xi[pos_label]
-            # Find player index
-            player_idx = comprehensive_df[comprehensive_df['Name'] == player_name].index
-            if len(player_idx) > 0:
-                second_choice[i] = player_idx[0]
-else:
-    # Use Hungarian algorithm
-    all_player_indices = list(range(n_players))
-    first_choice = choose_starting_xi(all_player_indices, score_matrix)
-    used_player_indices = set(first_choice.values())
-    remaining_players = [i for i in all_player_indices if i not in used_player_indices]
-    second_choice = choose_starting_xi(remaining_players, score_matrix)
+        # Convert custom selections to team format
+        formation_positions = [
+            ("GK", "GK"),
+            ("RB", "DL/DR"), ("CB1", "CB"), ("CB2", "CB"), ("LB", "DL/DR"),
+            ("DM1", "DM"), ("DM2", "DM"),
+            ("AMR", "AML/AMR"), ("AMC", "AMC"), ("AML", "AML/AMR"),
+            ("ST", "ST")
+        ]
+        
+        # Map custom selections to team indices
+        for i, (pos_label, role) in enumerate(formation_positions):
+            if pos_label in st.session_state.custom_first_xi:
+                player_name = st.session_state.custom_first_xi[pos_label]
+                # Find player index
+                player_idx = comprehensive_df[comprehensive_df['Name'] == player_name].index
+                if len(player_idx) > 0:
+                    first_choice[i] = player_idx[0]
+            
+            if pos_label in st.session_state.custom_second_xi:
+                player_name = st.session_state.custom_second_xi[pos_label]
+                # Find player index
+                player_idx = comprehensive_df[comprehensive_df['Name'] == player_name].index
+                if len(player_idx) > 0:
+                    second_choice[i] = player_idx[0]
+    else:
+        # Use Hungarian algorithm
+        all_player_indices = list(range(n_players))
+        first_choice = choose_starting_xi(all_player_indices, score_matrix)
+        used_player_indices = set(first_choice.values())
+        remaining_players = [i for i in all_player_indices if i not in used_player_indices]
+        second_choice = choose_starting_xi(remaining_players, score_matrix)
 
-st.markdown("<br>", unsafe_allow_html=True)
-# Display both teams side by side
-col1, col2 = st.columns(2)
+    st.markdown("<br>", unsafe_allow_html=True)
+    # Display both teams side by side
+    col1, col2 = st.columns(2)
 
-with col1:
-    team_name = "Custom First XI" if st.session_state.use_custom_teams else "First XI"
-    first_xi_html = render_xi(first_choice, team_name)
-    st.markdown(first_xi_html, unsafe_allow_html=True)
+    with col1:
+        team_name = "Custom First XI" if st.session_state.use_custom_teams else "First XI"
+        first_xi_html = render_xi(first_choice, team_name)
+        st.markdown(first_xi_html, unsafe_allow_html=True)
 
-with col2:
-    team_name = "Custom Second XI" if st.session_state.use_custom_teams else "Second XI"
-    second_xi_html = render_xi(second_choice, team_name)
-    st.markdown(second_xi_html, unsafe_allow_html=True)
+    with col2:
+        team_name = "Custom Second XI" if st.session_state.use_custom_teams else "Second XI"
+        second_xi_html = render_xi(second_choice, team_name)
+        st.markdown(second_xi_html, unsafe_allow_html=True)
 
 
