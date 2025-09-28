@@ -775,11 +775,11 @@ with tab1:
         
         st.markdown("---")
     
-    # Color-coded table with score-based coloring
-    def color_cell_by_score(val, role):
-        """Apply color coding based on score and role"""
+    # Color-coded table with text color based on score
+    def color_text_by_score(val, role):
+        """Apply text color coding based on score and role"""
         if pd.isna(val) or val == 0:
-            return 'background-color: #2d2d2d; color: #666666'
+            return 'color: #666666'
         
         # Color thresholds for each role (same as starting XI)
         ROLE_THRESHOLDS = {
@@ -801,10 +801,10 @@ with tab1:
         # Find appropriate color
         for threshold, color in thresholds:
             if val >= threshold:
-                return f'background-color: {color}; color: #000000; font-weight: bold'
+                return f'color: {color}; font-weight: bold'
         
         # Default color for very low scores
-        return 'background-color: #000000; color: #ffffff'
+        return 'color: #000000'
     
     # Apply color coding to the dataframe
     role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
@@ -816,7 +816,7 @@ with tab1:
     for role in role_columns:
         if role in comprehensive_df.columns:
             styled_df = styled_df.applymap(
-                lambda val, role=role: color_cell_by_score(val, role),
+                lambda val, role=role: color_text_by_score(val, role),
                 subset=[role]
             )
     
