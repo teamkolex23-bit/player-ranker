@@ -987,6 +987,13 @@ with tab1:
         
         return styles
     
+    # Convert numeric columns to float for proper sorting
+    numeric_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
+    for col in numeric_columns:
+        if col in display_df.columns:
+            # Convert to float but keep empty strings as is
+            display_df[col] = display_df[col].apply(lambda x: float(x) if pd.notna(x) and x != '' else x)
+    
     # Apply styling and display the dataframe
     styled_df = display_df.style.apply(lambda _: style_df(display_df), axis=None)
     
