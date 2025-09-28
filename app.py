@@ -926,47 +926,53 @@ with tab1:
                 
                 # Color coding for each position
                 if col == 'GK':
-                    if val_float >= 1600: return 'color: rgb(0, 255, 255)'
-                    elif val_float >= 1550: return 'color: rgb(0, 255, 0)'
-                    elif val_float >= 1400: return 'color: white'
-                    elif val_float >= 1300: return 'color: rgb(255, 255, 0)'
-                    elif val_float >= 1200: return 'color: rgb(255, 150, 0)'
-                    elif val_float >= 1100: return 'color: rgb(255, 0, 0)'
+                    if val_float >= 1600: return 'color: rgb(0, 255, 255)'      # BLUE
+                    elif val_float >= 1550: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
+                    elif val_float >= 1400: return 'color: white'               # WHITE
+                    elif val_float >= 1300: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
+                    elif val_float >= 1200: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
+                    elif val_float >= 1100: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
+                    else: return ''                                             # BLACK (1000 AND BELOW)
                 elif col == 'DL/DR':
-                    if val_float >= 1300: return 'color: rgb(0, 255, 255)'
-                    elif val_float >= 1250: return 'color: rgb(0, 255, 0)'
-                    elif val_float >= 1100: return 'color: white'
-                    elif val_float >= 1000: return 'color: rgb(255, 255, 0)'
-                    elif val_float >= 900: return 'color: rgb(255, 150, 0)'
-                    elif val_float >= 800: return 'color: rgb(255, 0, 0)'
+                    if val_float >= 1300: return 'color: rgb(0, 255, 255)'      # BLUE
+                    elif val_float >= 1250: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
+                    elif val_float >= 1100: return 'color: white'               # WHITE
+                    elif val_float >= 1000: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
+                    elif val_float >= 900: return 'color: rgb(255, 150, 0)'     # VIBRANT ORANGE
+                    elif val_float >= 800: return 'color: rgb(255, 0, 0)'       # VIBRANT RED
+                    else: return ''                                             # BLACK (700 AND BELOW)
                 elif col == 'CB':
-                    if val_float >= 1500: return 'color: rgb(0, 255, 255)'
-                    elif val_float >= 1450: return 'color: rgb(0, 255, 0)'
-                    elif val_float >= 1300: return 'color: white'
-                    elif val_float >= 1200: return 'color: rgb(255, 255, 0)'
-                    elif val_float >= 1100: return 'color: rgb(255, 150, 0)'
-                    elif val_float >= 1000: return 'color: rgb(255, 0, 0)'
+                    if val_float >= 1500: return 'color: rgb(0, 255, 255)'      # BLUE
+                    elif val_float >= 1450: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
+                    elif val_float >= 1300: return 'color: white'               # WHITE
+                    elif val_float >= 1200: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
+                    elif val_float >= 1100: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
+                    elif val_float >= 1000: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
+                    else: return ''                                             # BLACK (900 AND BELOW)
                 elif col == 'DM':
-                    if val_float >= 1400: return 'color: rgb(0, 255, 255)'
-                    elif val_float >= 1350: return 'color: rgb(0, 255, 0)'
-                    elif val_float >= 1200: return 'color: white'
-                    elif val_float >= 1100: return 'color: rgb(255, 255, 0)'
-                    elif val_float >= 1000: return 'color: rgb(255, 150, 0)'
-                    elif val_float >= 900: return 'color: rgb(255, 0, 0)'
+                    if val_float >= 1400: return 'color: rgb(0, 255, 255)'      # BLUE
+                    elif val_float >= 1350: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
+                    elif val_float >= 1200: return 'color: white'               # WHITE
+                    elif val_float >= 1100: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
+                    elif val_float >= 1000: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
+                    elif val_float >= 900: return 'color: rgb(255, 0, 0)'       # VIBRANT RED
+                    else: return ''                                             # BLACK (800 AND BELOW)
                 elif col in ['AML/AMR', 'AMC']:
-                    if val_float >= 1500: return 'color: rgb(0, 255, 255)'
-                    elif val_float >= 1450: return 'color: rgb(0, 255, 0)'
-                    elif val_float >= 1300: return 'color: white'
-                    elif val_float >= 1200: return 'color: rgb(255, 255, 0)'
-                    elif val_float >= 1100: return 'color: rgb(255, 150, 0)'
-                    elif val_float >= 1000: return 'color: rgb(255, 0, 0)'
+                    if val_float >= 1500: return 'color: rgb(0, 255, 255)'      # BLUE
+                    elif val_float >= 1450: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
+                    elif val_float >= 1300: return 'color: white'               # WHITE
+                    elif val_float >= 1200: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
+                    elif val_float >= 1100: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
+                    elif val_float >= 1000: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
+                    else: return ''                                             # BLACK (900 AND BELOW)
                 elif col == 'ST':
-                    if val_float >= 1700: return 'color: rgb(0, 255, 255)'
-                    elif val_float >= 1650: return 'color: rgb(0, 255, 0)'
-                    elif val_float >= 1450: return 'color: white'
-                    elif val_float >= 1300: return 'color: rgb(255, 255, 0)'
-                    elif val_float >= 1200: return 'color: rgb(255, 150, 0)'
-                    elif val_float >= 1100: return 'color: rgb(255, 0, 0)'
+                    if val_float >= 1700: return 'color: rgb(0, 255, 255)'      # BLUE
+                    elif val_float >= 1650: return 'color: rgb(0, 255, 0)'      # VIBRANT GREEN
+                    elif val_float >= 1450: return 'color: white'               # WHITE
+                    elif val_float >= 1300: return 'color: rgb(255, 255, 0)'    # VIBRANT YELLOW
+                    elif val_float >= 1200: return 'color: rgb(255, 150, 0)'    # VIBRANT ORANGE
+                    elif val_float >= 1100: return 'color: rgb(255, 0, 0)'      # VIBRANT RED
+                    else: return ''                                             # BLACK (1000 AND BELOW)
             except (ValueError, TypeError):
                 return ''
             return ''
