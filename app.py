@@ -775,52 +775,64 @@ with tab1:
         
         st.markdown("---")
     
-    # Color-coded table with text color based on score
-    def color_text_by_score(val, role):
-        """Apply text color coding based on score and role"""
+    # Simple color-coded table with better performance
+    def get_score_color(val, role):
+        """Get color for score based on role thresholds"""
         if pd.isna(val) or val == 0:
-            return 'color: #666666'
+            return '#666666'
         
-        # Color thresholds for each role (same as starting XI)
-        ROLE_THRESHOLDS = {
-            "GK": [(1600, '#00ffff'), (1550, '#00ff00'), (1400, '#ffffff'), (1300, '#ffff00'), (1200, '#ffa500'), (1100, '#ff0000'), (1000, '#000000')],
-            "DL/DR": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
-            "CB": [(1500, '#00ffff'), (1450, '#00ff00'), (1300, '#ffffff'), (1200, '#ffff00'), (1100, '#ffa500'), (1000, '#ff0000'), (900, '#000000')],
-            "WBL/WBR": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
-            "DM": [(1400, '#00ffff'), (1350, '#00ff00'), (1200, '#ffffff'), (1100, '#ffff00'), (1000, '#ffa500'), (900, '#ff0000'), (800, '#000000')],
-            "ML/MR": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
-            "CM": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
-            "AML/AMR": [(1500, '#00ffff'), (1450, '#00ff00'), (1300, '#ffffff'), (1200, '#ffff00'), (1100, '#ffa500'), (1000, '#ff0000'), (900, '#000000')],
-            "AMC": [(1500, '#00ffff'), (1450, '#00ff00'), (1300, '#ffffff'), (1200, '#ffff00'), (1100, '#ffa500'), (1000, '#ff0000'), (900, '#000000')],
-            "ST": [(1700, '#00ffff'), (1650, '#00ff00'), (1450, '#ffffff'), (1300, '#ffff00'), (1200, '#ffa500'), (1100, '#ff0000'), (1000, '#000000')]
-        }
-        
-        thresholds = ROLE_THRESHOLDS.get(role, [(1000, '#ffffff')])
-        thresholds = sorted(thresholds, key=lambda x: x[0], reverse=True)
-        
-        # Find appropriate color
-        for threshold, color in thresholds:
-            if val >= threshold:
-                return f'color: {color}; font-weight: bold'
-        
-        # Default color for very low scores
-        return 'color: #000000'
+        # Simplified thresholds for better performance
+        if role == "GK":
+            if val >= 1600: return '#00ffff'
+            elif val >= 1550: return '#00ff00'
+            elif val >= 1400: return '#ffffff'
+            elif val >= 1300: return '#ffff00'
+            elif val >= 1200: return '#ffa500'
+            elif val >= 1100: return '#ff0000'
+            else: return '#000000'
+        elif role == "CB":
+            if val >= 1500: return '#00ffff'
+            elif val >= 1450: return '#00ff00'
+            elif val >= 1300: return '#ffffff'
+            elif val >= 1200: return '#ffff00'
+            elif val >= 1100: return '#ffa500'
+            elif val >= 1000: return '#ff0000'
+            else: return '#000000'
+        elif role == "ST":
+            if val >= 1700: return '#00ffff'
+            elif val >= 1650: return '#00ff00'
+            elif val >= 1450: return '#ffffff'
+            elif val >= 1300: return '#ffff00'
+            elif val >= 1200: return '#ffa500'
+            elif val >= 1100: return '#ff0000'
+            else: return '#000000'
+        else:  # All other positions
+            if val >= 1300: return '#00ffff'
+            elif val >= 1250: return '#00ff00'
+            elif val >= 1100: return '#ffffff'
+            elif val >= 1000: return '#ffff00'
+            elif val >= 900: return '#ffa500'
+            elif val >= 800: return '#ff0000'
+            else: return '#000000'
     
-    # Apply color coding to the dataframe
+    # Create a copy for styling
+    display_df = comprehensive_df.copy()
+    
+    # Apply colors to role columns
     role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
     
-    # Create styled dataframe
+    # Use simpler styling approach
     styled_df = comprehensive_df.style
     
-    # Apply color coding to each role column
+    # Apply color coding more efficiently
     for role in role_columns:
         if role in comprehensive_df.columns:
-            styled_df = styled_df.applymap(
-                lambda val, role=role: color_text_by_score(val, role),
+            styled_df = styled_df.apply(
+                lambda x: [f'color: {get_score_color(val, role)}; font-weight: bold' for val in x],
                 subset=[role]
             )
     
-    # Display the styled dataframe
+    # Display with optimized settings
     st.dataframe(
         styled_df,
         use_container_width=True,
