@@ -888,118 +888,34 @@ with tab1:
             elif col == "ST":
                 display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
     
-    # Create a custom HTML table with colors and sorting
-    def create_sortable_colored_table(df):
-        html = """
-        <style>
-        .player-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: monospace;
-            font-size: 14px;
-            background: #1f2c38;
-            color: #fafafa;
-        }
-        .player-table th {
-            background: #2e4a5a;
-            color: #fafafa;
-            padding: 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-        }
-        .player-table th:hover {
-            background: #3a5a6a;
-        }
-        .player-table td {
-            padding: 6px 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-        }
-        .player-table tr:nth-child(even) {
-            background: #1a252f;
-        }
-        .player-table tr:hover {
-            background: #2a3a4a;
-        }
-        </style>
-        <table class="player-table" id="playerTable">
-        <thead>
-            <tr>
-        """
-        
-        # Add headers with sorting capability
-        for col in df.columns:
-            html += f"<th onclick=\"sortTable({df.columns.get_loc(col)})\">{col}</th>"
-        html += "</tr></thead><tbody>"
-        
-        # Add rows with colors
-        for _, row in df.iterrows():
-            html += "<tr>"
-            for col in df.columns:
-                val = row[col]
-                if col in role_columns and pd.notna(val) and val != 0 and val != '':
-                    # Convert to float for comparison
-                    try:
-                        val_float = float(val)
-                        color = get_score_color(val_float, col)
-                        if color == '':
-                            html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
-                        else:
-                            html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
-                    except (ValueError, TypeError):
-                        html += f"<td>{val}</td>"
+    # Use Streamlit's native dataframe with custom CSS for colors
+    # Create a styled dataframe using pandas styling
+    def style_scores(val, role):
+        if role in role_columns and pd.notna(val) and val != 0 and val != '':
+            try:
+                val_float = float(val)
+                color = get_score_color(val_float, role)
+                if color == '':
+                    return 'color: transparent; font-weight: bold;'
                 else:
-                    html += f"<td>{val}</td>"
-            html += "</tr>"
-        
-        html += """
-        </tbody></table>
-        <script>
-        function sortTable(n) {
-            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-            table = document.getElementById("playerTable");
-            switching = true;
-            dir = "asc";
-            while (switching) {
-                switching = false;
-                rows = table.rows;
-                for (i = 1; i < (rows.length - 1); i++) {
-                    shouldSwitch = false;
-                    x = rows[i].getElementsByTagName("TD")[n];
-                    y = rows[i + 1].getElementsByTagName("TD")[n];
-                    if (dir == "asc") {
-                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                            shouldSwitch = true;
-                            break;
-                        }
-                    } else if (dir == "desc") {
-                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                            shouldSwitch = true;
-                            break;
-                        }
-                    }
-                }
-                if (shouldSwitch) {
-                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                    switching = true;
-                    switchcount++;
-                } else {
-                    if (switchcount == 0 && dir == "asc") {
-                        dir = "desc";
-                        switching = true;
-                    }
-                }
-            }
-        }
-        </script>
-        """
-        return html
+                    return f'color: {color}; font-weight: bold;'
+            except (ValueError, TypeError):
+                return ''
+        return ''
     
-    # Display the colored sortable table
-    st.markdown(create_sortable_colored_table(display_df), unsafe_allow_html=True)
+    # Apply styling to the dataframe
+    styled_df = comprehensive_df.style
+    all_styled_columns = role_columns + empty_cell_columns
+    for col in all_styled_columns:
+        if col in comprehensive_df.columns:
+            styled_df = styled_df.apply(lambda x: [style_scores(val, col) for val in x], subset=[col])
+    
+    # Display the styled dataframe (this should be sortable)
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=400
+    )
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
