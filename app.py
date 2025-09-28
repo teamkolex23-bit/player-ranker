@@ -1053,16 +1053,82 @@ with tab1:
         
         return styles
 
-    # Helper functions for color styles (cached internally)
+    # Color interpolation helper
+    def _interpolate_color(val, thresholds):
+        """Interpolate between color thresholds"""
+        if val >= thresholds[0][0]:  # Above highest threshold
+            return thresholds[0][1]
+        
+        if val < thresholds[-1][0]:  # Below lowest threshold
+            return ''  # Empty for black zone
+        
+        # Find the two thresholds we're between
+        for i in range(len(thresholds) - 1):
+            high_val, high_color = thresholds[i]
+            low_val, low_color = thresholds[i + 1]
+            
+            if low_val <= val < high_val:
+                # Calculate how far we are between thresholds (0.0 to 1.0)
+                ratio = (val - low_val) / (high_val - low_val)
+                
+                # Parse colors
+                h1 = [int(high_color[0]), int(high_color[1]), int(high_color[2])]
+                h2 = [int(low_color[0]), int(low_color[1]), int(low_color[2])]
+                
+                # Interpolate each RGB component
+                r = int(h2[0] + (h1[0] - h2[0]) * ratio)
+                g = int(h2[1] + (h1[1] - h2[1]) * ratio)
+                b = int(h2[2] + (h1[2] - h2[2]) * ratio)
+                
+                return (r, g, b)
+        
+        return thresholds[-1][1]  # Fallback to lowest threshold color
+
+    # Define color thresholds for each position (RGB tuples)
+    BLUE = (0, 255, 255)
+    GREEN = (0, 255, 0)
+    WHITE = (255, 255, 255)
+    YELLOW = (255, 255, 0)
+    ORANGE = (255, 150, 0)
+    RED = (255, 0, 0)
+
+    GK_THRESHOLDS = [
+        (1600, BLUE), (1550, GREEN), (1400, WHITE),
+        (1300, YELLOW), (1200, ORANGE), (1100, RED)
+    ]
+
+    DLDR_THRESHOLDS = [
+        (1300, BLUE), (1250, GREEN), (1100, WHITE),
+        (1000, YELLOW), (900, ORANGE), (800, RED)
+    ]
+
+    CB_THRESHOLDS = [
+        (1500, BLUE), (1450, GREEN), (1300, WHITE),
+        (1200, YELLOW), (1100, ORANGE), (1000, RED)
+    ]
+
+    DM_THRESHOLDS = [
+        (1400, BLUE), (1350, GREEN), (1200, WHITE),
+        (1100, YELLOW), (1000, ORANGE), (900, RED)
+    ]
+
+    AM_THRESHOLDS = [
+        (1500, BLUE), (1450, GREEN), (1300, WHITE),
+        (1200, YELLOW), (1100, ORANGE), (1000, RED)
+    ]
+
+    ST_THRESHOLDS = [
+        (1700, BLUE), (1650, GREEN), (1450, WHITE),
+        (1300, YELLOW), (1200, ORANGE), (1100, RED)
+    ]
+
+    # Helper functions for color styles with interpolation
     def _get_gk_style(x):
         try:
             val = float(x)
-            if val >= 1600: return 'color: rgb(0, 255, 255); font-weight: bold'
-            elif val >= 1550: return 'color: rgb(0, 255, 0); font-weight: bold'
-            elif val >= 1400: return 'color: white; font-weight: bold'
-            elif val >= 1300: return 'color: rgb(255, 255, 0); font-weight: bold'
-            elif val >= 1200: return 'color: rgb(255, 150, 0); font-weight: bold'
-            elif val >= 1100: return 'color: rgb(255, 0, 0); font-weight: bold'
+            color = _interpolate_color(val, GK_THRESHOLDS)
+            if color:
+                return f'color: rgb{color}; font-weight: bold'
         except (ValueError, TypeError):
             pass
         return ''
@@ -1070,12 +1136,9 @@ with tab1:
     def _get_dldr_style(x):
         try:
             val = float(x)
-            if val >= 1300: return 'color: rgb(0, 255, 255); font-weight: bold'
-            elif val >= 1250: return 'color: rgb(0, 255, 0); font-weight: bold'
-            elif val >= 1100: return 'color: white; font-weight: bold'
-            elif val >= 1000: return 'color: rgb(255, 255, 0); font-weight: bold'
-            elif val >= 900: return 'color: rgb(255, 150, 0); font-weight: bold'
-            elif val >= 800: return 'color: rgb(255, 0, 0); font-weight: bold'
+            color = _interpolate_color(val, DLDR_THRESHOLDS)
+            if color:
+                return f'color: rgb{color}; font-weight: bold'
         except (ValueError, TypeError):
             pass
         return ''
@@ -1083,12 +1146,9 @@ with tab1:
     def _get_cb_style(x):
         try:
             val = float(x)
-            if val >= 1500: return 'color: rgb(0, 255, 255); font-weight: bold'
-            elif val >= 1450: return 'color: rgb(0, 255, 0); font-weight: bold'
-            elif val >= 1300: return 'color: white; font-weight: bold'
-            elif val >= 1200: return 'color: rgb(255, 255, 0); font-weight: bold'
-            elif val >= 1100: return 'color: rgb(255, 150, 0); font-weight: bold'
-            elif val >= 1000: return 'color: rgb(255, 0, 0); font-weight: bold'
+            color = _interpolate_color(val, CB_THRESHOLDS)
+            if color:
+                return f'color: rgb{color}; font-weight: bold'
         except (ValueError, TypeError):
             pass
         return ''
@@ -1096,12 +1156,9 @@ with tab1:
     def _get_dm_style(x):
         try:
             val = float(x)
-            if val >= 1400: return 'color: rgb(0, 255, 255); font-weight: bold'
-            elif val >= 1350: return 'color: rgb(0, 255, 0); font-weight: bold'
-            elif val >= 1200: return 'color: white; font-weight: bold'
-            elif val >= 1100: return 'color: rgb(255, 255, 0); font-weight: bold'
-            elif val >= 1000: return 'color: rgb(255, 150, 0); font-weight: bold'
-            elif val >= 900: return 'color: rgb(255, 0, 0); font-weight: bold'
+            color = _interpolate_color(val, DM_THRESHOLDS)
+            if color:
+                return f'color: rgb{color}; font-weight: bold'
         except (ValueError, TypeError):
             pass
         return ''
@@ -1109,12 +1166,9 @@ with tab1:
     def _get_am_style(x):
         try:
             val = float(x)
-            if val >= 1500: return 'color: rgb(0, 255, 255); font-weight: bold'
-            elif val >= 1450: return 'color: rgb(0, 255, 0); font-weight: bold'
-            elif val >= 1300: return 'color: white; font-weight: bold'
-            elif val >= 1200: return 'color: rgb(255, 255, 0); font-weight: bold'
-            elif val >= 1100: return 'color: rgb(255, 150, 0); font-weight: bold'
-            elif val >= 1000: return 'color: rgb(255, 0, 0); font-weight: bold'
+            color = _interpolate_color(val, AM_THRESHOLDS)
+            if color:
+                return f'color: rgb{color}; font-weight: bold'
         except (ValueError, TypeError):
             pass
         return ''
@@ -1122,12 +1176,9 @@ with tab1:
     def _get_st_style(x):
         try:
             val = float(x)
-            if val >= 1700: return 'color: rgb(0, 255, 255); font-weight: bold'
-            elif val >= 1650: return 'color: rgb(0, 255, 0); font-weight: bold'
-            elif val >= 1450: return 'color: white; font-weight: bold'
-            elif val >= 1300: return 'color: rgb(255, 255, 0); font-weight: bold'
-            elif val >= 1200: return 'color: rgb(255, 150, 0); font-weight: bold'
-            elif val >= 1100: return 'color: rgb(255, 0, 0); font-weight: bold'
+            color = _interpolate_color(val, ST_THRESHOLDS)
+            if color:
+                return f'color: rgb{color}; font-weight: bold'
         except (ValueError, TypeError):
             pass
         return ''
@@ -1536,5 +1587,4 @@ with tab2:
         team_name = "Custom Second XI" if st.session_state.use_custom_teams else "Second XI"
         second_xi_html = render_xi(second_choice, team_name)
         st.markdown(second_xi_html, unsafe_allow_html=True)
-
 
