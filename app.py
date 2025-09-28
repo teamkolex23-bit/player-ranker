@@ -5,6 +5,128 @@ import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
 import unicodedata
+# ---------- color constants + helper functions (REPLACE the small color block with this) ----------
+# Pick your vibrant sky-blue here; change hex to taste (recommended: "#40ccff" == RGB (64,204,255))
+VIBRANT_SKY = "#40ccff"        # <-- vibrant sky blue (change hex if you want a different tone)
+VGREEN = "#76ff7a"
+VYELLOW = "#ffeb3b"
+VORANGE = "#ff9800"
+VRED = "#ff5252"
+WHITE = "#ffffff"
+BLACK = "#000000"
+
+# Colorblind-friendly palette mapping (example)
+COLORBLIND_PALETTE = {
+    "blue": "#0072B2",
+    "green": "#009E73",
+    "yellow": "#F0E442",
+    "orange": "#E69F00",
+    "red": "#D55E00",
+    "white": "#ffffff",
+    "black": "#000000"
+}
+
+def _hex_to_rgb(hexstr):
+    """Convert '#rrggbb' to (r,g,b) ints."""
+    s = hexstr.lstrip('#')
+    if len(s) != 6:
+        raise ValueError("Expected 6-digit hex string like '#40ccff'")
+    return tuple(int(s[i:i+2], 16) for i in (0, 2, 4))
+
+def _lerp_color(c1, c2, t):
+    """Linearly interpolate two RGB tuples (c1->c2) by t in [0..1]."""
+    return (
+        int(round(c1[0] + (c2[0] - c1[0]) * t)),
+        int(round(c1[1] + (c2[1] - c1[1]) * t)),
+        int(round(c1[2] + (c2[2] - c1[2]) * t))
+    )
+
+def _rgb_to_css(rgb):
+    """Return CSS 'rgb(r,g,b)' string from (r,g,b)."""
+    return f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
+
+# Precomputed RGB tuples for the stops
+_RGB_VIBRANT_SKY = _hex_to_rgb(VIBRANT_SKY)
+_RGB_VGREEN = _hex_to_rgb(VGREEN)
+_RGB_WHITE = _hex_to_rgb(WHITE)
+_RGB_VYELLOW = _hex_to_rgb(VYELLOW)
+_RGB_VORANGE = _hex_to_rgb(VORANGE)
+_RGB_VRED = _hex_to_rgb(VRED)
+_RGB_BLACK = _hex_to_rgb(BLACK)
+
+# Role-specific thresholds expressed as (score_threshold, rgb_tuple)
+ROLE_THRESHOLDS = {
+    "GK":      [(1600, _RGB_VIBRANT_SKY), (1550, _RGB_VGREEN), (1400, _RGB_WHITE), (1300, _RGB_VYELLOW), (1200, _RGB_VORANGE), (1100, _RGB_VRED), (1000, _RGB_BLACK)],
+    "DL/DR":   [(1300, _RGB_VIBRANT_SKY), (1250, _RGB_VGREEN), (1100, _RGB_WHITE), (1000, _RGB_VYELLOW), (900, _RGB_VORANGE), (800, _RGB_VRED), (700, _RGB_BLACK)],
+    "CB":      [(1500, _RGB_VIBRANT_SKY), (1450, _RGB_VGREEN), (1300, _RGB_WHITE), (1200, _RGB_VYELLOW), (1100, _RGB_VORANGE), (1000, _RGB_VRED), (900, _RGB_BLACK)],
+    "DM":      [(1400, _RGB_VIBRANT_SKY), (1350, _RGB_VGREEN), (1200, _RGB_WHITE), (1100, _RGB_VYELLOW), (1000, _RGB_VORANGE), (900, _RGB_VRED), (800, _RGB_BLACK)],
+    "AML/AMR": [(1500, _RGB_VIBRANT_SKY), (1450, _RGB_VGREEN), (1300, _RGB_WHITE), (1200, _RGB_VYELLOW), (1100, _RGB_VORANGE), (1000, _RGB_VRED), (900, _RGB_BLACK)],
+    "AMC":     [(1500, _RGB_VIBRANT_SKY), (1450, _RGB_VGREEN), (1300, _RGB_WHITE), (1200, _RGB_VYELLOW), (1100, _RGB_VORANGE), (1000, _RGB_VRED), (900, _RGB_BLACK)],
+    "ST":      [(1700, _RGB_VIBRANT_SKY), (1650, _RGB_VGREEN), (1450, _RGB_WHITE), (1300, _RGB_VYELLOW), (1200, _RGB_VORANGE), (1100, _RGB_VRED), (1000, _RGB_BLACK)]
+}
+
+def get_role_color(role_key, score, colorblind=False):
+    """
+    Return CSS 'rgb(...)' color string for a role and numeric score.
+    Interpolates smoothly between adjacent colour stops when score falls between thresholds.
+    If `colorblind=True`, uses COLORBLIND_PALETTE mapping (approx).
+    """
+    # Normalize aliases
+    rk = role_key
+    if rk in {"RB", "LB"}:
+        rk = "DL/DR"
+    if rk in {"AMR", "AML"}:
+        rk = "AML/AMR"
+
+    thresholds = ROLE_THRESHOLDS.get(rk)
+    if not thresholds:
+        return _rgb_to_css(_RGB_WHITE)
+
+    # Sort thresholds high->low
+    thresholds_sorted = sorted(thresholds, key=lambda x: x[0], reverse=True)
+    top_val, top_col = thresholds_sorted[0]
+    bot_val, bot_col = thresholds_sorted[-1]
+
+    if score >= top_val:
+        rgb = top_col
+    elif score <= bot_val:
+        rgb = bot_col
+    else:
+        # find interval
+        rgb = _RGB_WHITE
+        for i in range(len(thresholds_sorted) - 1):
+            v_high, c_high = thresholds_sorted[i]
+            v_low,  c_low  = thresholds_sorted[i + 1]
+            if v_low <= score <= v_high:
+                if v_high == v_low:
+                    t = 0.0
+                else:
+                    t = (score - v_low) / (v_high - v_low)
+                rgb = _lerp_color(c_low, c_high, t)
+                break
+
+    # If colorblind mode requested map to approximate colorblind-safe hex
+    if colorblind:
+        # Choose nearest named stop by distance to map into COLORBLIND_PALETTE
+        # Simple heuristic: compare to main stop colors
+        stops = {
+            "blue": _RGB_VIBRANT_SKY,
+            "green": _RGB_VGREEN,
+            "yellow": _RGB_VYELLOW,
+            "orange": _RGB_VORANGE,
+            "red": _RGB_VRED,
+            "white": _RGB_WHITE,
+            "black": _RGB_BLACK
+        }
+        # find nearest stop (euclidean)
+        def dist(a,b): return (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2
+        nearest = min(stops.items(), key=lambda kv: dist(rgb, kv[1]))[0]
+        hexcb = COLORBLIND_PALETTE.get(nearest, "#ffffff")
+        # convert hex to rgb and return css
+        return _rgb_to_css(_hex_to_rgb(hexcb))
+
+    return _rgb_to_css(rgb)
+# -------------------------------------------------------------------------------------------
 
 # Page config with custom styling
 st.set_page_config(
@@ -672,78 +794,6 @@ def render_xi(chosen_map, team_name="Team"):
     team_total = sum(r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY")
     placed_scores = [r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY"]
     team_avg = np.mean(placed_scores) if placed_scores else 0.0
-    # --- Role-specific color thresholds + interpolation helpers ---
-    def _lerp_color(c1, c2, t):
-        """Linearly interpolate two RGB tuples (c1->c2) by t in [0..1]."""
-        return (
-            int(round(c1[0] + (c2[0] - c1[0]) * t)),
-            int(round(c1[1] + (c2[1] - c1[1]) * t)),
-            int(round(c1[2] + (c2[2] - c1[2]) * t))
-        )
-
-    def _rgb_to_css(rgb):
-        return f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
-
-    # Colour stops (RGB)
-    BLUE    = (0, 255, 255)
-    VGREEN  = (0, 255, 0)
-    WHITE   = (255, 255, 255)
-    VYELLOW = (255, 255, 0)
-    VORANGE = (255, 165, 0)
-    VRED    = (255, 0, 0)
-    BLACK   = (0, 0, 0)
-
-    ROLE_THRESHOLDS = {
-        "GK":      [(1600, BLUE), (1550, VGREEN), (1400, WHITE), (1300, VYELLOW), (1200, VORANGE), (1100, VRED), (1000, BLACK)],
-        "DL/DR":   [(1300, BLUE), (1250, VGREEN), (1100, WHITE), (1000, VYELLOW), (900, VORANGE), (800, VRED), (700, BLACK)],
-        "CB":      [(1500, BLUE), (1450, VGREEN), (1300, WHITE), (1200, VYELLOW), (1100, VORANGE), (1000, VRED), (900, BLACK)],
-        "DM":      [(1400, BLUE), (1350, VGREEN), (1200, WHITE), (1100, VYELLOW), (1000, VORANGE), (900, VRED), (800, BLACK)],
-        "AML/AMR": [(1500, BLUE), (1450, VGREEN), (1300, WHITE), (1200, VYELLOW), (1100, VORANGE), (1000, VRED), (900, BLACK)],
-        "AMC":     [(1500, BLUE), (1450, VGREEN), (1300, WHITE), (1200, VYELLOW), (1100, VORANGE), (1000, VRED), (900, BLACK)],
-        "ST":      [(1700, BLUE), (1650, VGREEN), (1450, WHITE), (1300, VYELLOW), (1200, VORANGE), (1100, VRED), (1000, BLACK)]
-    }
-
-    def get_role_color(role_key, score):
-        """Return CSS 'rgb(...)' color string for the given role and numeric score.
-           Interpolates smoothly between adjacent colour stops when score falls between thresholds.
-        """
-        rk = role_key
-
-        # Normalize some common role labels to the names used in thresholds
-        if rk in {"RB", "LB"}:
-            rk = "DL/DR"
-        if rk in {"AMR", "AML"}:
-            rk = "AML/AMR"
-
-        thresholds = ROLE_THRESHOLDS.get(rk)
-        if not thresholds:
-            return _rgb_to_css(WHITE)
-
-        # Ensure thresholds are sorted descending by value
-        thresholds_sorted = sorted(thresholds, key=lambda x: x[0], reverse=True)
-
-        top_val, top_col = thresholds_sorted[0]
-        bot_val, bot_col = thresholds_sorted[-1]
-
-        if score >= top_val:
-            return _rgb_to_css(top_col)
-        if score <= bot_val:
-            return _rgb_to_css(bot_col)
-
-        # find interval where v_low <= score <= v_high and interpolate
-        for i in range(len(thresholds_sorted) - 1):
-            v_high, c_high = thresholds_sorted[i]
-            v_low,  c_low  = thresholds_sorted[i + 1]
-            if v_low <= score <= v_high:
-                if v_high == v_low:
-                    t = 0.0
-                else:
-                    t = (score - v_low) / (v_high - v_low)
-                rgb = _lerp_color(c_low, c_high, t)
-                return _rgb_to_css(rgb)
-
-        return _rgb_to_css(WHITE)
-    # --- end role-specific color helpers ---
 
 # Format as table
     lines = [f"<div class='xi-formation'>"]
@@ -789,6 +839,7 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
+
 
 
 
