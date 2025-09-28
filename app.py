@@ -775,7 +775,7 @@ with tab1:
         
         st.markdown("---")
     
-    # Custom HTML table with colors for better performance
+    # Create a styled dataframe with colors that's sortable
     def get_score_color(val, role):
         """Get color for score based on role thresholds"""
         if pd.isna(val) or val == 0:
@@ -838,67 +838,28 @@ with tab1:
             elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
             else: return '#000000'                         # BLACK
     
-    # Create HTML table
-    def create_colored_table(df):
-        html = """
-        <style>
-        .player-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: monospace;
-            font-size: 14px;
-            background: #1f2c38;
-            color: #fafafa;
-        }
-        .player-table th {
-            background: #2e4a5a;
-            color: #fafafa;
-            padding: 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-            font-weight: bold;
-        }
-        .player-table td {
-            padding: 6px 8px;
-            text-align: center;
-            border: 1px solid #3c4b5a;
-        }
-        .player-table tr:nth-child(even) {
-            background: #1a252f;
-        }
-        .player-table tr:hover {
-            background: #2a3a4a;
-        }
-        </style>
-        <table class="player-table">
-        <thead>
-            <tr>
-        """
-        
-        # Add headers
-        for col in df.columns:
-            html += f"<th>{col}</th>"
-        html += "</tr></thead><tbody>"
-        
-        # Add rows
-        role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
-        
-        for _, row in df.iterrows():
-            html += "<tr>"
-            for col in df.columns:
-                if col in role_columns:
-                    val = row[col]
-                    color = get_score_color(val, col)
-                    html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
-                else:
-                    html += f"<td>{row[col]}</td>"
-            html += "</tr>"
-        
-        html += "</tbody></table>"
-        return html
+    # Create styled dataframe with colors that's sortable
+    role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
     
-    # Display the colored HTML table
-    st.markdown(create_colored_table(comprehensive_df), unsafe_allow_html=True)
+    # Create a styled dataframe using pandas styling
+    def style_scores(val, role):
+        if role in role_columns and pd.notna(val) and val != 0:
+            color = get_score_color(val, role)
+            return f'color: {color}; font-weight: bold;'
+        return ''
+    
+    # Apply styling to the dataframe
+    styled_df = comprehensive_df.style
+    for col in role_columns:
+        if col in comprehensive_df.columns:
+            styled_df = styled_df.apply(lambda x: [style_scores(val, col) for val in x], subset=[col])
+    
+    # Display the styled dataframe (this should be sortable)
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        height=400
+    )
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
