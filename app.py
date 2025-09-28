@@ -747,41 +747,7 @@ st.dataframe(
 # Now create the tabs for additional features
 with tab1:
     st.markdown("## Player Rankings by Position")
-    
-    # Advanced stats section
-    if st.session_state.user_preferences['show_advanced_stats']:
-        st.markdown("### Advanced Statistics")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            total_players = len(comprehensive_df)
-            st.metric("Total Players", total_players)
-        
-        with col2:
-            avg_age = comprehensive_df['Age'].replace('N/A', np.nan).astype(float).mean()
-            st.metric("Average Age", f"{avg_age:.1f}" if not pd.isna(avg_age) else "N/A")
-        
-        with col3:
-            # Find best overall player (highest average score across all positions)
-            role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
-            comprehensive_df['Overall_Avg'] = comprehensive_df[role_columns].mean(axis=1)
-            best_player = comprehensive_df.loc[comprehensive_df['Overall_Avg'].idxmax(), 'Name']
-            st.metric("Best Overall", best_player)
-        
-        with col4:
-            # Most versatile player (lowest standard deviation across positions)
-            comprehensive_df['Versatility'] = comprehensive_df[role_columns].std(axis=1)
-            most_versatile = comprehensive_df.loc[comprehensive_df['Versatility'].idxmin(), 'Name']
-            st.metric("Most Versatile", most_versatile)
-        
-        st.markdown("---")
-    
-    st.dataframe(
-        comprehensive_df,
-        use_container_width=True,
-        height=400
-    )
+    st.info("👆 The main table is displayed above. Use the tabs below for team building features.")
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
