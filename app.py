@@ -217,9 +217,6 @@ if 'custom_second_xi' not in st.session_state:
 if 'use_custom_teams' not in st.session_state:
     st.session_state.use_custom_teams = False
 
-# Apply theme CSS
-st.markdown(get_theme_css(st.session_state.light_mode, st.session_state.colorblind_mode), unsafe_allow_html=True)
-
 # Header
 st.markdown("""
 <div class="main-header">
@@ -561,6 +558,9 @@ with st.sidebar:
 
     **Deduplication**: Keeps the best version of duplicate entries.
     """)
+
+# Apply theme CSS after sidebar configuration
+st.markdown(get_theme_css(st.session_state.light_mode, st.session_state.colorblind_mode), unsafe_allow_html=True)
 
 st.markdown("""
 <div class="info-box">
