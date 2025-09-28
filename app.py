@@ -777,8 +777,54 @@ with tab1:
         
         st.markdown("---")
     
+    # Color-coded table with score-based coloring
+    def color_cell_by_score(val, role):
+        """Apply color coding based on score and role"""
+        if pd.isna(val) or val == 0:
+            return 'background-color: #2d2d2d; color: #666666'
+        
+        # Color thresholds for each role (same as starting XI)
+        ROLE_THRESHOLDS = {
+            "GK": [(1600, '#00ffff'), (1550, '#00ff00'), (1400, '#ffffff'), (1300, '#ffff00'), (1200, '#ffa500'), (1100, '#ff0000'), (1000, '#000000')],
+            "DL/DR": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
+            "CB": [(1500, '#00ffff'), (1450, '#00ff00'), (1300, '#ffffff'), (1200, '#ffff00'), (1100, '#ffa500'), (1000, '#ff0000'), (900, '#000000')],
+            "WBL/WBR": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
+            "DM": [(1400, '#00ffff'), (1350, '#00ff00'), (1200, '#ffffff'), (1100, '#ffff00'), (1000, '#ffa500'), (900, '#ff0000'), (800, '#000000')],
+            "ML/MR": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
+            "CM": [(1300, '#00ffff'), (1250, '#00ff00'), (1100, '#ffffff'), (1000, '#ffff00'), (900, '#ffa500'), (800, '#ff0000'), (700, '#000000')],
+            "AML/AMR": [(1500, '#00ffff'), (1450, '#00ff00'), (1300, '#ffffff'), (1200, '#ffff00'), (1100, '#ffa500'), (1000, '#ff0000'), (900, '#000000')],
+            "AMC": [(1500, '#00ffff'), (1450, '#00ff00'), (1300, '#ffffff'), (1200, '#ffff00'), (1100, '#ffa500'), (1000, '#ff0000'), (900, '#000000')],
+            "ST": [(1700, '#00ffff'), (1650, '#00ff00'), (1450, '#ffffff'), (1300, '#ffff00'), (1200, '#ffa500'), (1100, '#ff0000'), (1000, '#000000')]
+        }
+        
+        thresholds = ROLE_THRESHOLDS.get(role, [(1000, '#ffffff')])
+        thresholds = sorted(thresholds, key=lambda x: x[0], reverse=True)
+        
+        # Find appropriate color
+        for threshold, color in thresholds:
+            if val >= threshold:
+                return f'background-color: {color}; color: #000000; font-weight: bold'
+        
+        # Default color for very low scores
+        return 'background-color: #000000; color: #ffffff'
+    
+    # Apply color coding to the dataframe
+    role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
+    
+    # Create styled dataframe
+    styled_df = comprehensive_df.style
+    
+    # Apply color coding to each role column
+    for role in role_columns:
+        if role in comprehensive_df.columns:
+            styled_df = styled_df.applymap(
+                lambda val, role=role: color_cell_by_score(val, role),
+                subset=[role]
+            )
+    
+    # Display the styled dataframe
     st.dataframe(
-        comprehensive_df,
+        styled_df,
         use_container_width=True,
         height=400
     )
