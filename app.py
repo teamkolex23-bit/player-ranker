@@ -940,12 +940,17 @@ with tab1:
             html += "<tr>"
             for col in df.columns:
                 val = row[col]
-                if col in role_columns and pd.notna(val) and val != 0:
-                    color = get_score_color(val, col)
-                    if color == '':
-                        html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
-                    else:
-                        html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
+                if col in role_columns and pd.notna(val) and val != 0 and val != '':
+                    # Convert to float for comparison
+                    try:
+                        val_float = float(val)
+                        color = get_score_color(val_float, col)
+                        if color == '':
+                            html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
+                        else:
+                            html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
+                    except (ValueError, TypeError):
+                        html += f"<td>{val}</td>"
                 else:
                     html += f"<td>{val}</td>"
             html += "</tr>"
