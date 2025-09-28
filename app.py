@@ -788,7 +788,7 @@ with tab1:
             elif val >= 1300: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1200: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1100: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (1000 and below)
         elif role == "DL/DR":
             if val >= 1300: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1250: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -796,7 +796,7 @@ with tab1:
             elif val >= 1000: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 900: return 'rgb(255, 150, 0)'     # VIBRANT ORANGE
             elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (700 and below)
         elif role == "CB":
             if val >= 1500: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1450: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -804,7 +804,7 @@ with tab1:
             elif val >= 1200: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1100: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1000: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (900 and below)
         elif role == "DM":
             if val >= 1400: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1350: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -812,7 +812,7 @@ with tab1:
             elif val >= 1100: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1000: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 900: return 'rgb(255, 0, 0)'       # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (800 and below)
         elif role in ["AML/AMR", "AMC"]:
             if val >= 1500: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1450: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -820,7 +820,7 @@ with tab1:
             elif val >= 1200: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1100: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1000: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (900 and below)
         elif role == "ST":
             if val >= 1700: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1650: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -828,7 +828,7 @@ with tab1:
             elif val >= 1300: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 1200: return 'rgb(255, 150, 0)'    # VIBRANT ORANGE
             elif val >= 1100: return 'rgb(255, 0, 0)'      # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (1000 and below)
         else:  # WBL/WBR, ML/MR, CM (use DL/DR thresholds)
             if val >= 1300: return 'rgb(0, 255, 255)'      # BLUE
             elif val >= 1250: return 'rgb(0, 255, 0)'      # VIBRANT GREEN
@@ -836,7 +836,7 @@ with tab1:
             elif val >= 1000: return 'rgb(255, 255, 0)'    # VIBRANT YELLOW
             elif val >= 900: return 'rgb(255, 150, 0)'     # VIBRANT ORANGE
             elif val >= 800: return 'rgb(255, 0, 0)'       # VIBRANT RED
-            else: return ''                                # EMPTY (was BLACK)
+            else: return ''                                # BLACK (700 and below)
     
     # Create styled dataframe with colors that's sortable
     # Only apply colors to positions with specified thresholds
@@ -861,20 +861,140 @@ with tab1:
                 return 'color: transparent; font-weight: bold;'  # Empty for CM below 800
         return ''
     
-    # Apply styling to the dataframe
-    styled_df = comprehensive_df.style
-    # Apply styling to both colored columns and empty cell columns
-    all_styled_columns = role_columns + empty_cell_columns
-    for col in all_styled_columns:
-        if col in comprehensive_df.columns:
-            styled_df = styled_df.apply(lambda x: [style_scores(val, col) for val in x], subset=[col])
+    # Create a copy of the dataframe and modify values for display
+    display_df = comprehensive_df.copy()
     
-    # Display the styled dataframe (this should be sortable)
-    st.dataframe(
-        styled_df,
-        use_container_width=True,
-        height=400
-    )
+    # Apply empty cell logic to WBL/WBR, ML/MR, CM
+    for col in empty_cell_columns:
+        if col in display_df.columns:
+            if col in ['WBL/WBR', 'ML/MR']:
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 700 else x)
+            elif col == 'CM':
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 800 else x)
+    
+    # Apply empty cell logic to colored columns (very poor scores - BLACK zone)
+    for col in role_columns:
+        if col in display_df.columns:
+            if col == "GK":
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
+            elif col == "DL/DR":
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 700 else x)   # 700 and below = BLACK
+            elif col == "CB":
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 900 else x)   # 900 and below = BLACK
+            elif col == "DM":
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 800 else x)   # 800 and below = BLACK
+            elif col in ["AML/AMR", "AMC"]:
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 900 else x)   # 900 and below = BLACK
+            elif col == "ST":
+                display_df[col] = display_df[col].apply(lambda x: '' if pd.notna(x) and x < 1000 else x)  # 1000 and below = BLACK
+    
+    # Create a custom HTML table with colors and sorting
+    def create_sortable_colored_table(df):
+        html = """
+        <style>
+        .player-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: monospace;
+            font-size: 14px;
+            background: #1f2c38;
+            color: #fafafa;
+        }
+        .player-table th {
+            background: #2e4a5a;
+            color: #fafafa;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #3c4b5a;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+        .player-table th:hover {
+            background: #3a5a6a;
+        }
+        .player-table td {
+            padding: 6px 8px;
+            text-align: center;
+            border: 1px solid #3c4b5a;
+        }
+        .player-table tr:nth-child(even) {
+            background: #1a252f;
+        }
+        .player-table tr:hover {
+            background: #2a3a4a;
+        }
+        </style>
+        <table class="player-table" id="playerTable">
+        <thead>
+            <tr>
+        """
+        
+        # Add headers with sorting capability
+        for col in df.columns:
+            html += f"<th onclick=\"sortTable({df.columns.get_loc(col)})\">{col}</th>"
+        html += "</tr></thead><tbody>"
+        
+        # Add rows with colors
+        for _, row in df.iterrows():
+            html += "<tr>"
+            for col in df.columns:
+                val = row[col]
+                if col in role_columns and pd.notna(val) and val != 0:
+                    color = get_score_color(val, col)
+                    if color == '':
+                        html += f'<td style="color: transparent; font-weight: bold;">{val}</td>'
+                    else:
+                        html += f'<td style="color: {color}; font-weight: bold;">{val}</td>'
+                else:
+                    html += f"<td>{val}</td>"
+            html += "</tr>"
+        
+        html += """
+        </tbody></table>
+        <script>
+        function sortTable(n) {
+            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            table = document.getElementById("playerTable");
+            switching = true;
+            dir = "asc";
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[n];
+                    y = rows[i + 1].getElementsByTagName("TD")[n];
+                    if (dir == "asc") {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else if (dir == "desc") {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount == 0 && dir == "asc") {
+                        dir = "desc";
+                        switching = true;
+                    }
+                }
+            }
+        }
+        </script>
+        """
+        return html
+    
+    # Display the colored sortable table
+    st.markdown(create_sortable_colored_table(display_df), unsafe_allow_html=True)
 
 with tab2:
     st.markdown("## Automatic Teambuilder")
