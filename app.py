@@ -987,27 +987,164 @@ with tab1:
         
         return styles
     
-    # Convert numeric columns to integers for proper sorting and display
+    # Optimize table display for performance while keeping functionality
+    @st.cache_data(ttl=300)  # Cache data processing
+    def prepare_table_data(df, numeric_columns):
+        """Process table data with caching for better performance"""
+        # Create a copy for processing
+        processed_df = df.copy()
+        
+        # Process all numeric columns at once using vectorized operations
+        for col in numeric_columns:
+            if col in processed_df.columns:
+                # Convert to numeric and handle empty cells
+                processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce')
+                
+                # Apply thresholds for empty cells
+                if col in ['WBL/WBR', 'ML/MR']:
+                    mask = processed_df[col] < 700
+                    processed_df.loc[mask, col] = ''
+                elif col == 'CM':
+                    mask = processed_df[col] < 800
+                    processed_df.loc[mask, col] = ''
+                elif col == 'GK':
+                    mask = processed_df[col] < 1100
+                    processed_df.loc[mask, col] = ''
+                elif col == 'DL/DR':
+                    mask = processed_df[col] < 800
+                    processed_df.loc[mask, col] = ''
+                elif col == 'CB':
+                    mask = processed_df[col] < 1000
+                    processed_df.loc[mask, col] = ''
+                elif col == 'DM':
+                    mask = processed_df[col] < 900
+                    processed_df.loc[mask, col] = ''
+                elif col in ['AML/AMR', 'AMC']:
+                    mask = processed_df[col] < 1000
+                    processed_df.loc[mask, col] = ''
+                elif col == 'ST':
+                    mask = processed_df[col] < 1100
+                    processed_df.loc[mask, col] = ''
+                
+                # Format remaining values as integers
+                processed_df[col] = processed_df[col].apply(lambda x: f"{int(x)}" if pd.notna(x) and x != '' else '')
+        
+        return processed_df
+
+    @st.cache_data(ttl=300)  # Cache styling
+    def apply_table_styling(df, numeric_columns):
+        """Apply styling with caching for better performance"""
+        styles = pd.DataFrame('', index=df.index, columns=df.columns)
+        
+        for col in numeric_columns:
+            if col in df.columns:
+                if col == 'GK':
+                    styles[col] = df[col].apply(lambda x: _get_gk_style(x) if x != '' else '')
+                elif col == 'DL/DR':
+                    styles[col] = df[col].apply(lambda x: _get_dldr_style(x) if x != '' else '')
+                elif col == 'CB':
+                    styles[col] = df[col].apply(lambda x: _get_cb_style(x) if x != '' else '')
+                elif col == 'DM':
+                    styles[col] = df[col].apply(lambda x: _get_dm_style(x) if x != '' else '')
+                elif col in ['AML/AMR', 'AMC']:
+                    styles[col] = df[col].apply(lambda x: _get_am_style(x) if x != '' else '')
+                elif col == 'ST':
+                    styles[col] = df[col].apply(lambda x: _get_st_style(x) if x != '' else '')
+        
+        return styles
+
+    # Helper functions for color styles (cached internally)
+    def _get_gk_style(x):
+        try:
+            val = float(x)
+            if val >= 1600: return 'color: rgb(0, 255, 255); font-weight: bold'
+            elif val >= 1550: return 'color: rgb(0, 255, 0); font-weight: bold'
+            elif val >= 1400: return 'color: white; font-weight: bold'
+            elif val >= 1300: return 'color: rgb(255, 255, 0); font-weight: bold'
+            elif val >= 1200: return 'color: rgb(255, 150, 0); font-weight: bold'
+            elif val >= 1100: return 'color: rgb(255, 0, 0); font-weight: bold'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    def _get_dldr_style(x):
+        try:
+            val = float(x)
+            if val >= 1300: return 'color: rgb(0, 255, 255); font-weight: bold'
+            elif val >= 1250: return 'color: rgb(0, 255, 0); font-weight: bold'
+            elif val >= 1100: return 'color: white; font-weight: bold'
+            elif val >= 1000: return 'color: rgb(255, 255, 0); font-weight: bold'
+            elif val >= 900: return 'color: rgb(255, 150, 0); font-weight: bold'
+            elif val >= 800: return 'color: rgb(255, 0, 0); font-weight: bold'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    def _get_cb_style(x):
+        try:
+            val = float(x)
+            if val >= 1500: return 'color: rgb(0, 255, 255); font-weight: bold'
+            elif val >= 1450: return 'color: rgb(0, 255, 0); font-weight: bold'
+            elif val >= 1300: return 'color: white; font-weight: bold'
+            elif val >= 1200: return 'color: rgb(255, 255, 0); font-weight: bold'
+            elif val >= 1100: return 'color: rgb(255, 150, 0); font-weight: bold'
+            elif val >= 1000: return 'color: rgb(255, 0, 0); font-weight: bold'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    def _get_dm_style(x):
+        try:
+            val = float(x)
+            if val >= 1400: return 'color: rgb(0, 255, 255); font-weight: bold'
+            elif val >= 1350: return 'color: rgb(0, 255, 0); font-weight: bold'
+            elif val >= 1200: return 'color: white; font-weight: bold'
+            elif val >= 1100: return 'color: rgb(255, 255, 0); font-weight: bold'
+            elif val >= 1000: return 'color: rgb(255, 150, 0); font-weight: bold'
+            elif val >= 900: return 'color: rgb(255, 0, 0); font-weight: bold'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    def _get_am_style(x):
+        try:
+            val = float(x)
+            if val >= 1500: return 'color: rgb(0, 255, 255); font-weight: bold'
+            elif val >= 1450: return 'color: rgb(0, 255, 0); font-weight: bold'
+            elif val >= 1300: return 'color: white; font-weight: bold'
+            elif val >= 1200: return 'color: rgb(255, 255, 0); font-weight: bold'
+            elif val >= 1100: return 'color: rgb(255, 150, 0); font-weight: bold'
+            elif val >= 1000: return 'color: rgb(255, 0, 0); font-weight: bold'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    def _get_st_style(x):
+        try:
+            val = float(x)
+            if val >= 1700: return 'color: rgb(0, 255, 255); font-weight: bold'
+            elif val >= 1650: return 'color: rgb(0, 255, 0); font-weight: bold'
+            elif val >= 1450: return 'color: white; font-weight: bold'
+            elif val >= 1300: return 'color: rgb(255, 255, 0); font-weight: bold'
+            elif val >= 1200: return 'color: rgb(255, 150, 0); font-weight: bold'
+            elif val >= 1100: return 'color: rgb(255, 0, 0); font-weight: bold'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    # Process and display the table
     numeric_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
     
-    # Create a copy for sorting
-    sort_df = display_df.copy()
+    # Prepare data with caching
+    processed_df = prepare_table_data(display_df, numeric_columns)
     
-    for col in numeric_columns:
-        if col in display_df.columns:
-            # Convert empty strings to NaN for sorting
-            sort_df[col] = pd.to_numeric(sort_df[col], errors='coerce')
-            # Replace NaN with empty string for display
-            sort_df[col] = sort_df[col].fillna('')
-            
-            # Format non-empty values as integers
-            sort_df[col] = sort_df[col].apply(lambda x: 
-                f"{int(x)}" if pd.notna(x) and x != '' else '')
+    # Apply styling with caching
+    styles = apply_table_styling(processed_df, numeric_columns)
     
-    # Apply styling to the sorting dataframe
-    styled_df = sort_df.style.apply(lambda _: style_df(sort_df), axis=None)
+    # Create final styled dataframe
+    styled_df = processed_df.style.apply(lambda _: styles, axis=None)
     
-    # Display with sorting enabled
+    # Display with optimized settings
     st.dataframe(
         styled_df,
         use_container_width=True,
