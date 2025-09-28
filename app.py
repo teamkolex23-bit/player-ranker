@@ -5,9 +5,6 @@ import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
 import unicodedata
-from st_aggrid import AgGrid, GridOptionsBuilder
-from st_aggrid.shared import GridUpdateMode
-
 
 # Page config with custom styling
 st.set_page_config(
@@ -84,7 +81,7 @@ st.markdown("""
     border-radius: 10px;
     color: white;
     font-family: monospace;
-    border: 3px solid #3c4b5a;
+    border: 3px solid #3c4b5aa;
     min-height: 500px;
 }
     .stProgress .st-bo {
@@ -380,12 +377,6 @@ def deduplicate_players(df):
         return df
 
     df = df.copy()
-    
-    # Check if Name column exists
-    if 'Name' not in df.columns:
-        st.warning("⚠️ No 'Name' column found, skipping deduplication.")
-        return df
-    
     df['_name_key'] = df['Name'].apply(create_name_key)
     df['_transfer_val_numeric'] = df.get('Transfer Value', '').apply(parse_transfer_value)
 
@@ -498,16 +489,6 @@ if not available_attrs:
 # Deduplicate players first
 df_final = deduplicate_players(df)
 
-# Check if we have any players left after deduplication
-if len(df_final) == 0:
-    st.error("❌ No players remaining after deduplication.")
-    st.stop()
-
-# Check if Name column exists
-if 'Name' not in df_final.columns:
-    st.error("❌ Name column not found in player data.")
-    st.stop()
-
 # Calculate scores for all roles
 attrs_df_final = df_final[available_attrs].fillna(0).astype(float)
 attrs_norm_final = attrs_df_final
@@ -523,33 +504,20 @@ for role, weights in WEIGHTS_BY_ROLE.items():
 comprehensive_data = {
     'Rank': range(1, len(df_final) + 1),
     'Name': df_final['Name'],
-    'Age': df_final.get('Age', pd.Series(['N/A'] * len(df_final)))
+    'Age': df_final.get('Age', 'N/A')
 }
 
 # Add scores for each role
 for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']:
-    comprehensive_data[role] = role_scores[role].round(0).astype(int)
+    comprehensive_data[role] = role_scores[role].round(0).astype('Int64')
 
 comprehensive_df = pd.DataFrame(comprehensive_data)
 
-# Requires: pip install streamlit-aggrid
-from st_aggrid import AgGrid
-from st_aggrid.grid_options_builder import GridOptionsBuilder
-
-st.markdown("## Player Rankings by Position (client-side sort; no full rerun on header clicks)")
-
-gb = GridOptionsBuilder.from_dataframe(comprehensive_df)
-gb.configure_default_column(sortable=True, filter=True)
-gridOptions = gb.build()
-
-# Make sure AgGrid does not send sorting/filtering events back to Streamlit
-# GridUpdateMode.NO_UPDATE => no updates are sent back to Streamlit on client interactions
-ag = AgGrid(
+# Display the comprehensive table
+st.markdown("## Player Rankings by Position")
+st.dataframe(
     comprehensive_df,
-    gridOptions=gridOptions,
-    update_mode=GridUpdateMode.NO_UPDATE,   # <--- prevents sorting clicks from triggering a rerun
-    allow_unsafe_jscode=False,
-    fit_columns_on_grid_load=True,
+    use_container_width=True,
     height=400
 )
 
@@ -589,10 +557,6 @@ positions = [(label, role) for label, role in formation_lines if role != "EMPTY"
 n_players = len(df_final)
 n_positions = len(positions)
 player_names = df_final["Name"].astype(str).tolist()
-
-# Check if we have enough players for the formation
-if n_players < n_positions:
-    st.warning(f"⚠️ Only {n_players} players available, but formation requires {n_positions} positions. Some positions may be empty.")
 
 # Precompute role weight vectors
 role_weight_vectors = {}
@@ -748,5 +712,3 @@ with col1:
 with col2:
     second_xi_html = render_xi(second_choice, "Second XI")
     st.markdown(second_xi_html, unsafe_allow_html=True)
-
-
