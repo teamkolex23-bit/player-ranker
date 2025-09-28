@@ -5,13 +5,20 @@ import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
 import unicodedata
+import hashlib
+import time
 
-# Page config with custom styling
+# Page config with custom styling and performance optimizations
 st.set_page_config(
     layout="wide",
     page_title="FM24 Player Ranker",
     page_icon="⚽",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/streamlit/streamlit',
+        'Report a bug': "https://github.com/streamlit/streamlit/issues",
+        'About': "# FM24 Player Ranker\nBuilt for Football Manager 2024 player analysis"
+    }
 )
 
 # Custom CSS for better styling and a dark theme focus
@@ -97,13 +104,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state for team building
+# Initialize session state for team building and user preferences
 if 'custom_first_xi' not in st.session_state:
     st.session_state.custom_first_xi = {}
 if 'custom_second_xi' not in st.session_state:
     st.session_state.custom_second_xi = {}
 if 'use_custom_teams' not in st.session_state:
     st.session_state.use_custom_teams = False
+if 'user_preferences' not in st.session_state:
+    st.session_state.user_preferences = {
+        'default_view': 'Full Table',
+        'auto_refresh': False,
+        'show_advanced_stats': False,
+        'theme_preference': 'dark'
+    }
+if 'last_upload_time' not in st.session_state:
+    st.session_state.last_upload_time = None
+if 'file_hash' not in st.session_state:
+    st.session_state.file_hash = None
 
 # Header
 st.markdown("""
@@ -248,6 +266,7 @@ ABBR_MAP = {
     "1v1": "One on Ones", "Pun": "Punching (Tendency)", "Ref": "Reflexes", "TRO": "Rushing Out (Tendency)", "Thr": "Throwing"
 }
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def parse_players_from_html(html_text: str):
     soup = BeautifulSoup(html_text, "html.parser")
     table = soup.find("table")
@@ -297,6 +316,7 @@ def parse_players_from_html(html_text: str):
 
     return df, None
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
     cols = list(df.columns)
     if not any(cols.count(c) > 1 for c in cols):
@@ -322,6 +342,7 @@ def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     return merged
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def parse_transfer_value(x):
     """Parse transfer value strings into numeric values"""
     try:
@@ -364,6 +385,7 @@ def parse_transfer_value(x):
     except Exception:
         return 0.0
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def create_name_key(name):
     """Create name key for deduplication"""
     if pd.isna(name) or not name:
@@ -379,6 +401,7 @@ def create_name_key(name):
 
     return normalized
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def deduplicate_players(df):
     """Deduplicate players by name, keeping best version"""
     if len(df) <= 1:
@@ -420,8 +443,77 @@ def deduplicate_players(df):
 
     return df_deduped.reset_index(drop=True)
 
+def create_file_hash(uploaded_files):
+    """Create a hash of uploaded files to detect changes"""
+    file_contents = []
+    for file in uploaded_files:
+        file.seek(0)  # Reset file pointer
+        file_contents.append(file.read())
+        file.seek(0)  # Reset for later use
+    combined_content = b''.join(file_contents)
+    return hashlib.md5(combined_content).hexdigest()
+
+def should_refresh_cache(current_hash, last_hash):
+    """Determine if cache should be refreshed based on file changes"""
+    return current_hash != last_hash
+
 # Sidebar Configuration
 with st.sidebar:
+    # User Preferences
+    st.markdown("### User Preferences")
+    
+    # Default view preference
+    default_view = st.selectbox(
+        "Default View",
+        ["Full Table", "Automatic Teambuilder", "Custom Teambuilder"],
+        index=["Full Table", "Automatic Teambuilder", "Custom Teambuilder"].index(st.session_state.user_preferences['default_view']),
+        help="Choose your preferred default tab"
+    )
+    st.session_state.user_preferences['default_view'] = default_view
+    
+    # Advanced stats toggle
+    show_advanced = st.checkbox(
+        "Show Advanced Stats",
+        value=st.session_state.user_preferences['show_advanced_stats'],
+        help="Display additional player statistics and metrics"
+    )
+    st.session_state.user_preferences['show_advanced_stats'] = show_advanced
+    
+    # Auto-refresh toggle
+    auto_refresh = st.checkbox(
+        "Auto-refresh on File Change",
+        value=st.session_state.user_preferences['auto_refresh'],
+        help="Automatically refresh when new files are uploaded"
+    )
+    st.session_state.user_preferences['auto_refresh'] = auto_refresh
+    
+    # Cache management
+    st.markdown("### Cache Management")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🗑️ Clear Cache", help="Clear all cached data to refresh calculations"):
+            st.cache_data.clear()
+            st.success("Cache cleared!")
+            st.rerun()
+    
+    with col2:
+        if st.button("📊 Cache Stats", help="Show cache statistics"):
+            cache_size = len(st.cache_data._cache) if hasattr(st.cache_data, '_cache') else 0
+            st.info(f"Cache entries: {cache_size}")
+    
+    # Performance monitoring
+    st.markdown("### Performance")
+    if st.session_state.last_upload_time:
+        upload_time = time.strftime("%H:%M:%S", time.localtime(st.session_state.last_upload_time))
+        st.caption(f"Last upload: {upload_time}")
+    
+    # Memory usage indicator
+    if st.button("💾 Memory Usage", help="Check current memory usage"):
+        import psutil
+        memory = psutil.virtual_memory()
+        st.info(f"Memory: {memory.percent}% used ({memory.used // (1024**2)} MB)")
+    
     # Analysis info
     st.markdown("### Analysis Info")
     st.info("""
@@ -430,11 +522,16 @@ with st.sidebar:
     **Scoring**: Higher scores means better fit in that position. Some positions are just naturally inflated for every player.
 
     **Deduplication**: Keeps the best version of duplicate entries.
+    
+    **Performance**: Data is cached for faster loading. Use "Clear Cache" if you need fresh calculations.
     """)
 
 
-# Create tabs for different views
-tab1, tab2, tab3 = st.tabs(["📊 Full Table", "🤖 Automatic Teambuilder", "⚽ Custom Teambuilder"])
+# Create tabs for different views with user preference
+tab_names = ["📊 Full Table", "🤖 Automatic Teambuilder", "⚽ Custom Teambuilder"]
+default_tab_index = tab_names.index(f"📊 {st.session_state.user_preferences['default_view']}") if f"📊 {st.session_state.user_preferences['default_view']}" in tab_names else 0
+
+tab1, tab2, tab3 = st.tabs(tab_names)
 
 st.markdown("""
 <div class="info-box">
@@ -454,6 +551,18 @@ uploaded_files = st.file_uploader(
 
 if not uploaded_files:
     st.stop()
+
+# Check for file changes and optimize processing
+current_file_hash = create_file_hash(uploaded_files)
+file_changed = should_refresh_cache(current_file_hash, st.session_state.file_hash)
+
+if file_changed:
+    st.session_state.file_hash = current_file_hash
+    st.session_state.last_upload_time = time.time()
+    # Clear cache if files changed and auto-refresh is enabled
+    if st.session_state.user_preferences['auto_refresh']:
+        st.cache_data.clear()
+        st.success("🔄 Files changed! Cache cleared and refreshing...")
 
 # Process files and show summary
 dfs = []
@@ -517,32 +626,73 @@ if 'Name' not in df_final.columns:
     st.error("❌ Name column not found in player data.")
     st.stop()
 
-# Calculate scores for all roles
-attrs_df_final = df_final[available_attrs].fillna(0).astype(float)
-attrs_norm_final = attrs_df_final
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
+def calculate_role_scores(df_final, available_attrs):
+    """Calculate role scores for all players"""
+    attrs_df_final = df_final[available_attrs].fillna(0).astype(float)
+    attrs_norm_final = attrs_df_final
+    
+    role_scores = {}
+    for role, weights in WEIGHTS_BY_ROLE.items():
+        w = pd.Series({a: float(weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
+        scores = attrs_norm_final.values.dot(w.values.astype(float))
+        role_scores[role] = scores
+    
+    return role_scores, attrs_norm_final
 
-# Calculate scores for each role
-role_scores = {}
-for role, weights in WEIGHTS_BY_ROLE.items():
-    w = pd.Series({a: float(weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-    scores = attrs_norm_final.values.dot(w.values.astype(float))
-    role_scores[role] = scores
+# Calculate scores for all roles
+role_scores, attrs_norm_final = calculate_role_scores(df_final, available_attrs)
+
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
+def create_comprehensive_table(df_final, role_scores):
+    """Create the comprehensive player rankings table"""
+    comprehensive_data = {
+        'Rank': range(1, len(df_final) + 1),
+        'Name': df_final['Name'],
+        'Age': df_final.get('Age', pd.Series(['N/A'] * len(df_final)))
+    }
+    
+    # Add scores for each role
+    for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']:
+        comprehensive_data[role] = role_scores[role].round(0).astype(int)
+    
+    return pd.DataFrame(comprehensive_data)
 
 # Create the new comprehensive table
-comprehensive_data = {
-    'Rank': range(1, len(df_final) + 1),
-    'Name': df_final['Name'],
-    'Age': df_final.get('Age', pd.Series(['N/A'] * len(df_final)))
-}
-
-# Add scores for each role
-for role in ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']:
-    comprehensive_data[role] = role_scores[role].round(0).astype(int)
-
-comprehensive_df = pd.DataFrame(comprehensive_data)
+comprehensive_df = create_comprehensive_table(df_final, role_scores)
 
 with tab1:
     st.markdown("## Player Rankings by Position")
+    
+    # Advanced stats section
+    if st.session_state.user_preferences['show_advanced_stats']:
+        st.markdown("### Advanced Statistics")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_players = len(comprehensive_df)
+            st.metric("Total Players", total_players)
+        
+        with col2:
+            avg_age = comprehensive_df['Age'].replace('N/A', np.nan).astype(float).mean()
+            st.metric("Average Age", f"{avg_age:.1f}" if not pd.isna(avg_age) else "N/A")
+        
+        with col3:
+            # Find best overall player (highest average score across all positions)
+            role_columns = ['GK', 'DL/DR', 'CB', 'WBL/WBR', 'DM', 'ML/MR', 'CM', 'AML/AMR', 'AMC', 'ST']
+            comprehensive_df['Overall_Avg'] = comprehensive_df[role_columns].mean(axis=1)
+            best_player = comprehensive_df.loc[comprehensive_df['Overall_Avg'].idxmax(), 'Name']
+            st.metric("Best Overall", best_player)
+        
+        with col4:
+            # Most versatile player (lowest standard deviation across positions)
+            comprehensive_df['Versatility'] = comprehensive_df[role_columns].std(axis=1)
+            most_versatile = comprehensive_df.loc[comprehensive_df['Versatility'].idxmin(), 'Name']
+            st.metric("Most Versatile", most_versatile)
+        
+        st.markdown("---")
+    
     st.dataframe(
         comprehensive_df,
         use_container_width=True,
@@ -660,20 +810,33 @@ player_names = df_final["Name"].astype(str).tolist()
 if n_players < n_positions:
     st.warning(f"⚠️ Only {n_players} players available, but formation requires {n_positions} positions. Some positions may be empty.")
 
-# Precompute role weight vectors
-role_weight_vectors = {}
-for _, role_key in positions:
-    if role_key not in role_weight_vectors: # Avoid re-computing for same role
-        rw = WEIGHTS_BY_ROLE.get(role_key, {})
-        role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
+def compute_score_matrix(df_final, available_attrs, positions):
+    """Compute the score matrix for team building"""
+    n_players = len(df_final)
+    n_positions = len(positions)
+    
+    # Precompute role weight vectors
+    role_weight_vectors = {}
+    for _, role_key in positions:
+        if role_key not in role_weight_vectors: # Avoid re-computing for same role
+            rw = WEIGHTS_BY_ROLE.get(role_key, {})
+            role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs], dtype=float)
+
+    # Compute score matrix
+    score_matrix = np.zeros((n_players, n_positions), dtype=float)
+    attrs_norm_final = df_final[available_attrs].fillna(0).astype(float)
+    
+    for i_idx in range(n_players):
+        player_attr_vals = attrs_norm_final.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
+        for p_idx, (_, role_key) in enumerate(positions):
+            w = role_weight_vectors[role_key]
+            score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
+    
+    return score_matrix
 
 # Compute score matrix
-score_matrix = np.zeros((n_players, n_positions), dtype=float)
-for i_idx in range(n_players):
-    player_attr_vals = attrs_norm_final.iloc[i_idx].values if len(available_attrs) > 0 else np.zeros((len(available_attrs),), dtype=float)
-    for p_idx, (_, role_key) in enumerate(positions):
-        w = role_weight_vectors[role_key]
-        score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
+score_matrix = compute_score_matrix(df_final, available_attrs, positions)
 
 # Hungarian algorithm assignment
 try:
@@ -681,6 +844,7 @@ try:
 except Exception:
     linear_sum_assignment = None
 
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def choose_starting_xi(available_player_indices, current_score_matrix):
     avail = list(available_player_indices)
     num_avail = len(avail)
