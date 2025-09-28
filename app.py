@@ -1,737 +1,538 @@
-import re
-import math
-import numpy as np
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
 from bs4 import BeautifulSoup
-import unicodedata
+import io
+from scipy.optimize import linear_sum_assignment
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
 
-# Page config with custom styling
+# Page configuration
 st.set_page_config(
-    layout="wide",
-    page_title="FM24 Player Ranker",
+    page_title="Football Manager Player Analyzer",
     page_icon="⚽",
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling and a dark theme focus
+# Custom CSS for beautiful design
 st.markdown("""
 <style>
-    /* Base styles for dark theme */
-    body {
-        color: #fafafa;
-    }
     .main-header {
-        background: linear-gradient(90deg, #1f4e79, #2e8b57);
-        padding: 2rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
+        font-size: 3rem;
+        font-weight: bold;
         text-align: center;
-        color: white;
+        background: linear-gradient(90deg, #1f4e79, #2e8b57);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 2rem;
     }
-    .main-header h1 {
-        color: white;
-        margin: 0;
-        font-size: 2.5rem;
+    
+    .formation-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    .player-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    
+    .player-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .score-excellent {
+        color: #00ff00;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .score-poor {
+        color: #ff0000;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .score-average {
+        color: #666666;
         font-weight: bold;
     }
-    /* Updated card styles for dark theme */
-    .section-card {
-        background: #1f2c38; /* Darker background */
+    
+    .metric-container {
+        background: #f8f9fa;
         padding: 1.5rem;
         border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        margin-bottom: 1.5rem;
-        border-left: 4px solid #1f4e79;
-        color: #fafafa; /* Light text */
+        margin: 1rem 0;
+        border-left: 4px solid #2e8b57;
     }
-    .info-box {
-        background: #1a3a5a; /* Darker info box */
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #4169e1;
-        margin-bottom: 1rem;
-        color: #fafafa;
+    
+    .stSelectbox > div > div {
+        background-color: white;
     }
-    .metric-card {
-        background: #1f2c38; /* Darker metric card */
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-        border: 2px solid #3c4b5a;
-        color: #fafafa;
-    }
-    /* Brighter header colors for metric cards */
-    .metric-card h3.blue { color: #66b2ff; }
-    .metric-card h3.green { color: #76ff7a; }
-    .metric-card h3.purple { color: #c792ea; }
-    .metric-card h3.orange { color: #ffcb6b; }
-
-    .role-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 5px;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-.xi-formation {
-    background: #1f2c38;
-    padding: 2rem;
-    border-radius: 10px;
-    color: white;
-    font-family: monospace;
-    border: 3px solid #3c4b5a;
-    min-height: 500px;
-}
-    .stProgress .st-bo {
-        background-color: #e8f4fd;
-    }
-    .upload-section {
-        border: 2px dashed #ccc;
-        border-radius: 10px;
-        padding: 2rem;
-        text-align: center;
-        background: #1f2c38;
+    
+    .stFileUploader > div > div {
+        background-color: white;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown("""
-<div class="main-header">
-    <h1>FM24 Player Ranker</h1>
-</div>
-""", unsafe_allow_html=True)
-
-CANONICAL_ATTRIBUTES = [
-    "Corners", "Crossing", "Dribbling", "Finishing", "First Touch", "Free Kick Taking",
-    "Heading", "Long Shots", "Long Throws", "Marking", "Passing", "Penalty Taking",
-    "Tackling", "Technique", "Aggression", "Anticipation", "Bravery", "Composure",
-    "Concentration", "Decisions", "Determination", "Flair", "Leadership", "Off The Ball",
-    "Positioning", "Teamwork", "Vision", "Work Rate", "Acceleration", "Agility",
-    "Balance", "Jumping Reach", "Natural Fitness", "Pace", "Stamina", "Strength",
-    "Weaker Foot", "Aerial Reach", "Command of Area", "Communication", "Eccentricity",
-    "Handling", "Kicking", "One on Ones", "Punching (Tendency)", "Reflexes",
-    "Rushing Out (Tendency)", "Throwing"
-]
-
-WEIGHTS_BY_ROLE = {
-    "GK": {
-        "Corners": 0.0, "Crossing": 0.0, "Dribbling": 0.0, "Finishing": 0.0, "First Touch": 0.0, "Free Kick Taking": 0.0,
-        "Heading": 1.0, "Long Shots": 0.0, "Long Throws": 0.0, "Marking": 0.0, "Passing": 0.0, "Penalty Taking": 0.0,
-        "Tackling": 0.0, "Technique": 1.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 6.0, "Composure": 2.0,
-        "Concentration": 6.0, "Decisions": 10.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 2.0, "Off The Ball": 0.0,
-        "Positioning": 5.0, "Teamwork": 2.0, "Vision": 1.0, "Work Rate": 1.0, "Acceleration": 6.0, "Agility": 8.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 3.0, "Stamina": 1.0, "Strength": 4.0,
-        "Weaker Foot": 3.0, "Aerial Reach": 6.0, "Command of Area": 6.0, "Communication": 5.0, "Eccentricity": 0.0,
-        "Handling": 8.0, "Kicking": 5.0, "One on Ones": 4.0, "Punching (Tendency)": 0.0, "Reflexes": 8.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 3.0
+# Position weights dictionary
+POSITION_WEIGHTS = {
+    'GK': {
+        'Aerial Reach': 6.0, 'Command of Area': 6.0, 'Communication': 5.0, 'Eccentricity': 0.0,
+        'First Touch': 1.0, 'Handling': 8.0, 'Kicking': 5.0, 'One on Ones': 4.0, 'Passing': 3.0,
+        'Punching (Tendency)': 0.0, 'Reflexes': 8.0, 'Rushing Out (Tendency)': 0.0, 'Throwing': 3.0,
+        'Anticipation': 3.0, 'Bravery': 6.0, 'Composure': 2.0, 'Concentration': 6.0, 'Decisions': 10.0,
+        'Leadership': 2.0, 'Positioning': 5.0, 'Acceleration': 6.0, 'Agility': 8.0, 'Balance': 2.0,
+        'Jumping Reach': 1.0, 'Pace': 3.0, 'Stamina': 1.0, 'Strength': 4.0, 'Weaker Foot': 3.0
     },
-    "DL/DR": {
-        "Corners": 1.0, "Crossing": 2.0, "Dribbling": 1.0, "Finishing": 1.0, "First Touch": 3.0, "Free Kick Taking": 1.0,
-        "Heading": 2.0, "Long Shots": 1.0, "Long Throws": 1.0, "Marking": 3.0, "Passing": 2.0, "Penalty Taking": 1.0,
-        "Tackling": 4.0, "Technique": 2.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 2.0, "Composure": 2.0,
-        "Concentration": 4.0, "Decisions": 7.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 1.0,
-        "Positioning": 4.0, "Teamwork": 2.0, "Vision": 2.0, "Work Rate": 2.0, "Acceleration": 7.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 2.0, "Natural Fitness": 0.0, "Pace": 5.0, "Stamina": 6.0, "Strength": 4.0,
-        "Weaker Foot": 4.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'DL/DR': {
+        'Corners': 0.0, 'Crossing': 2.0, 'Dribbling': 1.0, 'Finishing': 1.0, 'First Touch': 3.0,
+        'Free Kick Taking': 1.0, 'Heading': 2.0, 'Long Shots': 1.0, 'Long Throws': 1.0, 'Marking': 3.0,
+        'Passing': 2.0, 'Penalty Taking': 1.0, 'Tackling': 4.0, 'Technique': 1.0, 'Anticipation': 3.0,
+        'Bravery': 2.0, 'Composure': 2.0, 'Concentration': 4.0, 'Decisions': 7.0, 'Leadership': 1.0,
+        'Off The Ball': 1.0, 'Positioning': 4.0, 'Teamwork': 2.0, 'Vision': 2.0, 'Work Rate': 1.0,
+        'Acceleration': 6.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 2.0, 'Pace': 3.0,
+        'Stamina': 6.0, 'Strength': 4.0, 'Weaker Foot': 4.0
     },
-    "CB": {
-        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 1.0, "Finishing": 1.0, "First Touch": 2.0, "Free Kick Taking": 1.0,
-        "Heading": 5.0, "Long Shots": 1.0, "Long Throws": 1.0, "Marking": 8.0, "Passing": 2.0, "Penalty Taking": 1.0,
-        "Tackling": 5.0, "Technique": 1.0, "Aggression": 0.0, "Anticipation": 5.0, "Bravery": 2.0, "Composure": 2.0,
-        "Concentration": 4.0, "Decisions": 10.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 2.0, "Off The Ball": 1.0,
-        "Positioning": 8.0, "Teamwork": 1.0, "Vision": 1.0, "Work Rate": 2.0, "Acceleration": 6.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 6.0, "Natural Fitness": 0.0, "Pace": 5.0, "Stamina": 3.0, "Strength": 6.0,
-        "Weaker Foot": 4.5, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'CB': {
+        'Corners': 0.0, 'Crossing': 1.0, 'Dribbling': 1.0, 'Finishing': 1.0, 'First Touch': 2.0,
+        'Free Kick Taking': 1.0, 'Heading': 5.0, 'Long Shots': 1.0, 'Long Throws': 1.0, 'Marking': 8.0,
+        'Passing': 2.0, 'Penalty Taking': 1.0, 'Tackling': 5.0, 'Technique': 1.0, 'Anticipation': 5.0,
+        'Bravery': 2.0, 'Composure': 2.0, 'Concentration': 4.0, 'Decisions': 10.0, 'Leadership': 2.0,
+        'Off The Ball': 1.0, 'Positioning': 8.0, 'Teamwork': 1.0, 'Vision': 1.0, 'Work Rate': 2.0,
+        'Acceleration': 6.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 6.0, 'Pace': 5.0,
+        'Stamina': 3.0, 'Strength': 6.0, 'Weaker Foot': 4.0
     },
-    "WBL/WBR": {
-        "Corners": 1.0, "Crossing": 3.0, "Dribbling": 2.0, "Finishing": 1.0, "First Touch": 3.0, "Free Kick Taking": 1.0,
-        "Heading": 1.0, "Long Shots": 1.0, "Long Throws": 1.0, "Marking": 2.0, "Passing": 3.0, "Penalty Taking": 1.0,
-        "Tackling": 3.0, "Technique": 3.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 2.0,
-        "Concentration": 3.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 2.0,
-        "Positioning": 3.0, "Teamwork": 2.0, "Vision": 2.0, "Work Rate": 2.0, "Acceleration": 8.0, "Agility": 5.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 6.0, "Stamina": 7.0, "Strength": 4.0,
-        "Weaker Foot": 4.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'WBL/WBR': {
+        'Corners': 0.0, 'Crossing': 3.0, 'Dribbling': 2.0, 'Finishing': 2.0, 'First Touch': 3.0,
+        'Free Kick Taking': 1.0, 'Heading': 1.0, 'Long Shots': 3.0, 'Long Throws': 1.0, 'Marking': 3.0,
+        'Passing': 4.0, 'Penalty Taking': 1.0, 'Tackling': 7.0, 'Technique': 3.0, 'Anticipation': 3.0,
+        'Bravery': 1.0, 'Composure': 2.0, 'Concentration': 3.0, 'Decisions': 5.0, 'Leadership': 1.0,
+        'Off The Ball': 2.0, 'Positioning': 5.0, 'Teamwork': 2.0, 'Vision': 4.0, 'Work Rate': 2.0,
+        'Acceleration': 8.0, 'Agility': 5.0, 'Balance': 2.0, 'Jumping Reach': 1.0, 'Pace': 6.0,
+        'Stamina': 7.0, 'Strength': 5.0, 'Weaker Foot': 5.0
     },
-    "DM": {
-        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 2.0, "Finishing": 2.0, "First Touch": 4.0, "Free Kick Taking": 1.0,
-        "Heading": 1.0, "Long Shots": 3.0, "Long Throws": 1.0, "Marking": 3.0, "Passing": 4.0, "Penalty Taking": 1.0,
-        "Tackling": 7.0, "Technique": 3.0, "Aggression": 0.0, "Anticipation": 5.0, "Bravery": 1.0, "Composure": 2.0,
-        "Concentration": 3.0, "Decisions": 8.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 1.0,
-        "Positioning": 5.0, "Teamwork": 2.0, "Vision": 4.0, "Work Rate": 4.0, "Acceleration": 6.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 4.0, "Stamina": 4.0, "Strength": 5.0,
-        "Weaker Foot": 5.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'DM': {
+        'Corners': 0.0, 'Crossing': 1.0, 'Dribbling': 3.0, 'Finishing': 2.0, 'First Touch': 4.0,
+        'Free Kick Taking': 1.0, 'Heading': 1.0, 'Long Shots': 2.0, 'Long Throws': 1.0, 'Marking': 1.0,
+        'Passing': 3.0, 'Penalty Taking': 1.0, 'Tackling': 2.0, 'Technique': 3.0, 'Anticipation': 3.0,
+        'Bravery': 1.0, 'Composure': 2.0, 'Concentration': 2.0, 'Decisions': 5.0, 'Leadership': 1.0,
+        'Off The Ball': 2.0, 'Positioning': 1.0, 'Teamwork': 2.0, 'Vision': 3.0, 'Work Rate': 3.0,
+        'Acceleration': 6.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 1.0, 'Pace': 6.0,
+        'Stamina': 5.0, 'Strength': 3.0, 'Weaker Foot': 5.0
     },
-    "ML/MR": {
-        "Corners": 1.0, "Crossing": 5.0, "Dribbling": 3.0, "Finishing": 2.0, "First Touch": 4.0, "Free Kick Taking": 1.0,
-        "Heading": 1.0, "Long Shots": 2.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 3.0, "Penalty Taking": 1.0,
-        "Tackling": 2.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 2.0,
-        "Concentration": 2.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 2.0,
-        "Positioning": 1.0, "Teamwork": 2.0, "Vision": 3.0, "Work Rate": 3.0, "Acceleration": 8.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 6.0, "Stamina": 5.0, "Strength": 3.0,
-        "Weaker Foot": 5.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'ML/MR': {
+        'Corners': 0.0, 'Crossing': 5.0, 'Dribbling': 2.0, 'Finishing': 2.0, 'First Touch': 4.0,
+        'Free Kick Taking': 1.0, 'Heading': 1.0, 'Long Shots': 3.0, 'Long Throws': 1.0, 'Marking': 1.0,
+        'Passing': 6.0, 'Penalty Taking': 1.0, 'Tackling': 3.0, 'Technique': 4.0, 'Anticipation': 3.0,
+        'Bravery': 1.0, 'Composure': 2.0, 'Concentration': 2.0, 'Decisions': 7.0, 'Leadership': 1.0,
+        'Off The Ball': 3.0, 'Positioning': 3.0, 'Teamwork': 2.0, 'Vision': 6.0, 'Work Rate': 3.0,
+        'Acceleration': 8.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 1.0, 'Pace': 6.0,
+        'Stamina': 6.0, 'Strength': 4.0, 'Weaker Foot': 5.0
     },
-    "CM": {
-        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 2.0, "Finishing": 2.0, "First Touch": 6.0, "Free Kick Taking": 1.0,
-        "Heading": 1.0, "Long Shots": 3.0, "Long Throws": 1.0, "Marking": 3.0, "Passing": 6.0, "Penalty Taking": 1.0,
-        "Tackling": 3.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 3.0,
-        "Concentration": 2.0, "Decisions": 7.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 3.0,
-        "Positioning": 3.0, "Teamwork": 2.0, "Vision": 6.0, "Work Rate": 3.0, "Acceleration": 6.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 5.0, "Stamina": 6.0, "Strength": 4.0,
-        "Weaker Foot": 6.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'MC': {
+        'Corners': 0.0, 'Crossing': 1.0, 'Dribbling': 5.0, 'Finishing': 2.0, 'First Touch': 6.0,
+        'Free Kick Taking': 1.0, 'Heading': 1.0, 'Long Shots': 3.0, 'Long Throws': 1.0, 'Marking': 3.0,
+        'Passing': 2.0, 'Penalty Taking': 1.0, 'Tackling': 2.0, 'Technique': 4.0, 'Anticipation': 3.0,
+        'Bravery': 1.0, 'Composure': 3.0, 'Concentration': 2.0, 'Decisions': 5.0, 'Leadership': 1.0,
+        'Off The Ball': 2.0, 'Positioning': 1.0, 'Teamwork': 2.0, 'Vision': 3.0, 'Work Rate': 3.0,
+        'Acceleration': 6.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 1.0, 'Pace': 5.0,
+        'Stamina': 7.0, 'Strength': 3.0, 'Weaker Foot': 6.0
     },
-    "AML/AMR": {
-        "Corners": 1.0, "Crossing": 5.0, "Dribbling": 5.0, "Finishing": 2.0, "First Touch": 5.0, "Free Kick Taking": 1.0,
-        "Heading": 1.0, "Long Shots": 2.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 2.0, "Penalty Taking": 1.0,
-        "Tackling": 2.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 3.0,
-        "Concentration": 2.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 2.0,
-        "Positioning": 1.0, "Teamwork": 2.0, "Vision": 3.0, "Work Rate": 3.0, "Acceleration": 10.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 10.0, "Stamina": 7.0, "Strength": 3.0,
-        "Weaker Foot": 5.5, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'AML/AMR': {
+        'Corners': 0.0, 'Crossing': 5.0, 'Dribbling': 5.0, 'Finishing': 3.0, 'First Touch': 5.0,
+        'Free Kick Taking': 1.0, 'Heading': 1.0, 'Long Shots': 2.0, 'Long Throws': 1.0, 'Marking': 1.0,
+        'Passing': 4.0, 'Penalty Taking': 1.0, 'Tackling': 2.0, 'Technique': 5.0, 'Anticipation': 3.0,
+        'Bravery': 1.0, 'Composure': 3.0, 'Concentration': 2.0, 'Decisions': 5.0, 'Leadership': 1.0,
+        'Off The Ball': 3.0, 'Positioning': 1.0, 'Teamwork': 2.0, 'Vision': 6.0, 'Work Rate': 3.0,
+        'Acceleration': 10.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 1.0, 'Pace': 10.0,
+        'Stamina': 7.0, 'Strength': 3.0, 'Weaker Foot': 5.0
     },
-    "AMC": {
-        "Corners": 1.0, "Crossing": 1.0, "Dribbling": 3.0, "Finishing": 3.0, "First Touch": 5.0, "Free Kick Taking": 1.0,
-        "Heading": 1.0, "Long Shots": 3.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 4.0, "Penalty Taking": 1.0,
-        "Tackling": 2.0, "Technique": 5.0, "Aggression": 0.0, "Anticipation": 3.0, "Bravery": 1.0, "Composure": 3.0,
-        "Concentration": 2.0, "Decisions": 6.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 3.0,
-        "Positioning": 2.0, "Teamwork": 2.0, "Vision": 6.0, "Work Rate": 3.0, "Acceleration": 9.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 1.0, "Natural Fitness": 0.0, "Pace": 7.0, "Stamina": 6.0, "Strength": 3.0,
-        "Weaker Foot": 7.0, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'AMC': {
+        'Corners': 0.0, 'Crossing': 1.0, 'Dribbling': 3.0, 'Finishing': 8.0, 'First Touch': 6.0,
+        'Free Kick Taking': 1.0, 'Heading': 1.0, 'Long Shots': 2.0, 'Long Throws': 1.0, 'Marking': 1.0,
+        'Passing': 2.0, 'Penalty Taking': 1.0, 'Tackling': 2.0, 'Technique': 4.0, 'Anticipation': 3.0,
+        'Bravery': 1.0, 'Composure': 6.0, 'Concentration': 2.0, 'Decisions': 5.0, 'Leadership': 1.0,
+        'Off The Ball': 6.0, 'Positioning': 2.0, 'Teamwork': 1.0, 'Vision': 2.0, 'Work Rate': 2.0,
+        'Acceleration': 9.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 5.0, 'Pace': 7.0,
+        'Stamina': 6.0, 'Strength': 6.0, 'Weaker Foot': 7.0
     },
-    "ST": {
-        "Corners": 1.0, "Crossing": 2.0, "Dribbling": 5.0, "Finishing": 8.0, "First Touch": 6.0, "Free Kick Taking": 1.0,
-        "Heading": 6.0, "Long Shots": 2.0, "Long Throws": 1.0, "Marking": 1.0, "Passing": 2.0, "Penalty Taking": 1.0,
-        "Tackling": 1.0, "Technique": 4.0, "Aggression": 0.0, "Anticipation": 5.0, "Bravery": 1.0, "Composure": 6.0,
-        "Concentration": 2.0, "Decisions": 5.0, "Determination": 0.0, "Flair": 0.0, "Leadership": 1.0, "Off The Ball": 6.0,
-        "Positioning": 2.0, "Teamwork": 1.0, "Vision": 2.0, "Work Rate": 2.0, "Acceleration": 10.0, "Agility": 6.0,
-        "Balance": 2.0, "Jumping Reach": 5.0, "Natural Fitness": 0.0, "Pace": 7.0, "Stamina": 6.0, "Strength": 6.0,
-        "Weaker Foot": 7.5, "Aerial Reach": 0.0, "Command of Area": 0.0, "Communication": 0.0, "Eccentricity": 0.0,
-        "Handling": 0.0, "Kicking": 0.0, "One on Ones": 0.0, "Punching (Tendency)": 0.0, "Reflexes": 0.0,
-        "Rushing Out (Tendency)": 0.0, "Throwing": 0.0
+    'ST': {
+        'Corners': 0.0, 'Crossing': 2.0, 'Dribbling': 5.0, 'Finishing': 8.0, 'First Touch': 6.0,
+        'Free Kick Taking': 1.0, 'Heading': 6.0, 'Long Shots': 2.0, 'Long Throws': 1.0, 'Marking': 1.0,
+        'Passing': 2.0, 'Penalty Taking': 1.0, 'Tackling': 1.0, 'Technique': 4.0, 'Anticipation': 5.0,
+        'Bravery': 1.0, 'Composure': 6.0, 'Concentration': 2.0, 'Decisions': 5.0, 'Leadership': 1.0,
+        'Off The Ball': 6.0, 'Positioning': 2.0, 'Teamwork': 1.0, 'Vision': 2.0, 'Work Rate': 2.0,
+        'Acceleration': 10.0, 'Agility': 6.0, 'Balance': 2.0, 'Jumping Reach': 5.0, 'Pace': 7.0,
+        'Stamina': 6.0, 'Strength': 6.0, 'Weaker Foot': 7.0
     }
 }
 
-ABBR_MAP = {
-    "Name": "Name", "Position": "Position", "Inf": "Inf", "Age": "Age", "Transfer Value": "Transfer Value",
-    "Cor": "Corners", "Cro": "Crossing", "Dri": "Dribbling", "Fin": "Finishing", "Fir": "First Touch", "Fre": "Free Kick Taking",
-    "Hea": "Heading", "Lon": "Long Shots", "L Th": "Long Throws", "LTh": "Long Throws", "Mar": "Marking", "Pas": "Passing", "Pen": "Penalty Taking",
-    "Tck": "Tackling", "Tec": "Technique", "Agg": "Aggression", "Ant": "Anticipation", "Bra": "Bravery", "Cmp": "Composure", "Cnt": "Concentration",
-    "Dec": "Decisions", "Det": "Determination", "Fla": "Flair", "Ldr": "Leadership", "OtB": "Off The Ball", "Pos": "Positioning", "Tea": "Teamwork", "Vis": "Vision", "Wor": "Work Rate",
-    "Acc": "Acceleration", "Agi": "Agility", "Bal": "Balance", "Jum": "Jumping Reach", "Nat": "Natural Fitness", "Pac": "Pace", "Sta": "Stamina", "Str": "Strength",
-    "Weaker Foot": "Weaker Foot", "Aer": "Aerial Reach", "Cmd": "Command of Area", "Com": "Communication", "Ecc": "Eccentricity", "Han": "Handling", "Kic": "Kicking",
-    "1v1": "One on Ones", "Pun": "Punching (Tendency)", "Ref": "Reflexes", "TRO": "Rushing Out (Tendency)", "Thr": "Throwing"
-}
+def parse_html_file(html_content):
+    """Parse HTML file and extract player data"""
+    soup = BeautifulSoup(html_content, 'html.parser')
+    table = soup.find('table')
+    
+    if not table:
+        return pd.DataFrame()
+    
+    # Extract headers
+    headers = []
+    header_row = table.find('tr')
+    for th in header_row.find_all('th'):
+        headers.append(th.get_text(strip=True))
+    
+    # Extract data rows
+    data = []
+    for row in table.find_all('tr')[1:]:  # Skip header row
+        row_data = []
+        for td in row.find_all('td'):
+            row_data.append(td.get_text(strip=True))
+        if len(row_data) == len(headers):
+            data.append(row_data)
+    
+    df = pd.DataFrame(data, columns=headers)
+    return df
 
-def parse_players_from_html(html_text: str):
-    soup = BeautifulSoup(html_text, "html.parser")
-    table = soup.find("table")
-    if table is None:
-        return None, "No <table> found in HTML."
-
-    header_row = table.find("tr")
-    if header_row is None:
-        return None, "No rows in table."
-
-    ths = header_row.find_all(["th", "td"])
-    header_cells = [th.get_text(strip=True) for th in ths]
-    canonical = [ABBR_MAP.get(h, h) for h in header_cells]
-
-    rows = []
-    for tr in table.find_all("tr")[1:]:
-        cols = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
-        if not cols or all(not c for c in cols):
-            continue
-
-        if len(cols) < len(canonical):
-            cols += [""] * (len(canonical) - len(cols))
-        cols = cols[:len(canonical)]
-
-        row = {col_name: val for col_name, val in zip(canonical, cols) if col_name}
-
-        name = (row.get("Name") or "").strip()
-        if not name or name.lower() == "name":
-            continue
-
-        rows.append(row)
-
-    if not rows:
-        return None, "No data rows parsed from HTML table."
-
-    df = pd.DataFrame(rows)
-
-    # convert numeric-like columns except textual ones
-    for c in df.columns:
-        if c in ("Name", "Position", "Transfer Value", "Inf"):
-            continue
-        df[c] = df[c].astype(str).str.extract(r'(-?\d+(?:\.\d+)?)')[0]
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    if "Age" in df.columns:
-        df["Age"] = pd.to_numeric(df["Age"], errors="coerce").astype("Int64")
-
-    return df, None
-
-def merge_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
-    cols = list(df.columns)
-    if not any(cols.count(c) > 1 for c in cols):
+def clean_and_process_data(df):
+    """Clean and process the player data"""
+    if df.empty:
         return df
-
-    unique_order = []
-    for c in cols:
-        if c not in unique_order:
-            unique_order.append(c)
-
-    merged = pd.DataFrame(index=df.index)
-    for col in unique_order:
-        same_cols = [c for c in cols if c == col]
-        if len(same_cols) == 1:
-            merged[col] = df[col]
-        else:
-            subset = df.loc[:, same_cols]
-            subset_num = subset.apply(pd.to_numeric, errors="coerce")
-            if subset_num.notna().sum().sum() > 0:
-                merged[col] = subset_num.mean(axis=1)
-            else:
-                merged[col] = subset.apply(lambda r: next((v for v in r if isinstance(v, str) and v.strip()), ""), axis=1)
-
-    return merged
-
-def parse_transfer_value(x):
-    """Parse transfer value strings into numeric values"""
-    try:
-        if pd.isna(x):
-            return 0.0
-        s = str(x).strip()
-        if not s or s == "-" or s.lower() in {"n/a", "none"}:
-            return 0.0
-
-        s2 = re.sub(r'[^0-9\.,kKmM]', '', s)
-        if s2 == "":
-            m = re.search(r'(-?\d+(?:\.\d+)?)', s)
-            if m:
-                try:
-                    return float(m.group(1).replace(',', ''))
-                except Exception:
-                    return 0.0
-            return 0.0
-
-        m = re.match(r'([0-9\.,]+)\s*([kKmM]?)', s2)
-        if not m:
+    
+    # Convert numeric columns
+    numeric_columns = ['Age'] + [col for col in df.columns if col not in ['Name', 'Position', 'Inf', 'Transfer Value']]
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Clean transfer value column
+    if 'Transfer Value' in df.columns:
+        df['Transfer Value Cleaned'] = df['Transfer Value'].str.replace('€', '').str.replace('K', '000').str.replace('M', '000000')
+        df['Transfer Value Cleaned'] = df['Transfer Value Cleaned'].str.replace(' - ', '-')
+        
+        # Handle ranges by taking the average
+        def parse_transfer_value(value):
+            if pd.isna(value) or value == '':
+                return 0
             try:
-                return float(s2.replace(',', ''))
-            except Exception:
-                return 0.0
-
-        num = m.group(1).replace(',', '')
-        try:
-            val = float(num)
-        except Exception:
-            val = 0.0
-
-        suf = m.group(2).lower()
-        if suf == 'k':
-            val *= 1_000.0
-        elif suf == 'm':
-            val *= 1_000_000.0
-
-        return val
-    except Exception:
-        return 0.0
-
-def create_name_key(name):
-    """Create name key for deduplication"""
-    if pd.isna(name) or not name:
-        return f"_empty_{id(name)}"
-
-    name_str = str(name).strip()
-    if not name_str:
-        return f"_empty_{id(name)}"
-
-    normalized = re.sub(r'\s+', ' ', name_str.lower().strip())
-    normalized = normalized.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-    normalized = normalized.replace('ñ', 'n').replace('ç', 'c')
-
-    return normalized
-
-def deduplicate_players(df):
-    """Deduplicate players by name, keeping best version"""
-    if len(df) <= 1:
-        return df
-
-    df = df.copy()
-    df['_name_key'] = df['Name'].apply(create_name_key)
-    df['_transfer_val_numeric'] = df.get('Transfer Value', '').apply(parse_transfer_value)
-
-    df_sorted = df.sort_values(['Score', '_transfer_val_numeric'], ascending=[False, False])
-    df_deduped = df_sorted.drop_duplicates(subset=['_name_key'], keep='first')
-    df_deduped = df_deduped.drop(columns=['_name_key', '_transfer_val_numeric'])
-
-    duplicates_removed = len(df) - len(df_deduped)
-    if duplicates_removed > 0:
-        st.success(f"✅ Removed {duplicates_removed} duplicate player(s)")
-
-    return df_deduped.reset_index(drop=True)
-
-# Sidebar Configuration
-with st.sidebar:
-    # Role selection
-    ROLE_OPTIONS = list(WEIGHTS_BY_ROLE.keys())
-    role = st.selectbox(
-        "Choose Position to display score for",
-        ROLE_OPTIONS,
-        index=ROLE_OPTIONS.index("ST") if "ST" in ROLE_OPTIONS else 0,
-        help="Not necessary since I also include a top 10 for every position"
-    )
-
-    # Analysis info
-    st.markdown("### Analysis Info")
-    st.info("""
-    **Position Weights Score**: From FMScout (IMO still accurate even if outdated unlike the FM-Arena attribute testing)
-
-    **Scoring**: Higher scores means better fit in that position. Some positions are just naturally inflated for every player.
-
-    **Deduplication**: Keeps the best version of duplicate entries.
-    """)
-
-st.markdown("""
-<div class="info-box">
-    <strong>Upload Instructions:</strong><br>
-    • Go to <a href="https://fmarenacalc.com" target="_blank">fmarenacalc.com</a> for HTML export guide<br>
-    • Maximum 260 players can be exported per html file, so make sure to narrow your search before each print screen<br>
-    • Multiple files can be uploaded simultaneously<br>
-    • Supports .html only and not .rtf like the NewGAN mod
-</div>
-""", unsafe_allow_html=True)
-
-uploaded_files = st.file_uploader(
-    "Follow the 'Upload Instructions:' above and upload the HTML files you print screened from FM24 here below",
-    type=["html", "htm"],
-    accept_multiple_files=True
-)
-
-
-if not uploaded_files:
-    st.stop()
-
-# Process files and show summary
-dfs = []
-file_results = []
-
-# Create progress bar
-progress_bar = st.progress(0)
-status_text = st.empty()
-
-for i, uploaded in enumerate(uploaded_files):
-    # Update progress
-    progress_bar.progress((i + 1) / len(uploaded_files))
-    status_text.text(f'Processing {uploaded.name}...')
+                if '-' in str(value):
+                    parts = str(value).split('-')
+                    return (float(parts[0]) + float(parts[1])) / 2
+                else:
+                    return float(value)
+            except:
+                return 0
+        
+        df['Transfer Value Numeric'] = df['Transfer Value Cleaned'].apply(parse_transfer_value)
     
-    raw = uploaded.read()
-    try:
-        html_text = raw.decode('utf-8', errors='ignore')
-    except Exception:
-        html_text = raw.decode('latin-1', errors='ignore')
+    # Remove duplicates based on name, keeping highest transfer value
+    if 'Transfer Value Numeric' in df.columns:
+        df = df.sort_values('Transfer Value Numeric', ascending=False).drop_duplicates('Name', keep='first')
+    
+    return df
 
-    df, err = parse_players_from_html(html_text)
-    if df is None:
-        file_results.append(f"❌ {uploaded.name}: Failed to read")
-        continue
+def calculate_position_score(player_data, position):
+    """Calculate player score for a specific position"""
+    if position not in POSITION_WEIGHTS:
+        return 0
+    
+    weights = POSITION_WEIGHTS[position]
+    total_score = 0
+    total_weight = 0
+    
+    for attribute, weight in weights.items():
+        if attribute in player_data and not pd.isna(player_data[attribute]) and weight > 0:
+            total_score += player_data[attribute] * weight
+            total_weight += weight
+    
+    return total_score / total_weight if total_weight > 0 else 0
 
-    df = merge_duplicate_columns(df)
-    df = df.reset_index(drop=True)
-    dfs.append(df)
-    file_results.append(f"✅ {uploaded.name}: {len(df)} players loaded")
+def calculate_all_position_scores(df):
+    """Calculate scores for all positions for all players"""
+    positions = list(POSITION_WEIGHTS.keys())
+    
+    for position in positions:
+        df[f'{position}_Score'] = df.apply(lambda row: calculate_position_score(row, position), axis=1)
+    
+    return df
 
-# Complete the progress bar
-progress_bar.progress(1.0)
-status_text.text('Processing complete!')
-
-if not dfs:
-    st.error("❌ No valid player data parsed from any uploaded file.")
-    st.stop()
-
-# Show results
-for result in file_results:
-    st.write(result)
-
-# Combine all data
-df = pd.concat(dfs, ignore_index=True)
-available_attrs = [a for a in CANONICAL_ATTRIBUTES if a in df.columns]
-
-if not available_attrs:
-    st.error("❌ No matching attribute columns found. Detected columns: " + ", ".join(list(df.columns)))
-    st.stop()
-
-# Calculate scores and deduplicate
-attrs_df = df[available_attrs].fillna(0).astype(float)
-attrs_norm = attrs_df
-
-selected_weights = WEIGHTS_BY_ROLE.get(role, {})
-weights = pd.Series({a: float(selected_weights.get(a, 0.0)) for a in available_attrs}).reindex(available_attrs).fillna(0.0)
-
-scores = attrs_norm.values.dot(weights.values.astype(float))
-df['Score'] = scores
-
-df_final = deduplicate_players(df)
-df_sorted = df_final.sort_values("Score", ascending=False).reset_index(drop=True)
-
-# Main Rankings with enhanced display
-st.markdown(f"## All players score as a {role}")
-
-ranked = df_sorted.copy()
-ranked.insert(0, "Rank", range(1, len(ranked) + 1))
-
-# Enhanced dataframe display
-cols_to_show = [c for c in ["Rank", "Name", "Position", "Age", "Transfer Value", "Score"] if c in ranked.columns]
-
-display_df = ranked
-
-st.dataframe(
-    display_df[cols_to_show + [c for c in available_attrs if c in display_df.columns]],
-    use_container_width=True,
-    height=400
-)
-
-# Compact Role Analysis
-st.markdown("## Top 10 in each position")
-
-# Role analysis without tabs
-available_attrs_final = [a for a in CANONICAL_ATTRIBUTES if a in df_final.columns]
-attrs_df_final = df_final[available_attrs_final].fillna(0).astype(float)
-attrs_norm_final = attrs_df_final
-
-roles_per_row = 4
-for i in range(0, len(ROLE_OPTIONS), roles_per_row):
-    cols = st.columns(roles_per_row)
-    for j, r in enumerate(ROLE_OPTIONS[i:i+roles_per_row]):
-        with cols[j]:
-            st.markdown(f'<div class="role-header">{r}</div>', unsafe_allow_html=True)
-
-            rw = WEIGHTS_BY_ROLE.get(r, {})
-            w = pd.Series({a: float(rw.get(a, 0.0)) for a in available_attrs_final}).reindex(available_attrs_final).fillna(0.0)
-            sc = attrs_norm_final.values.dot(w.values.astype(float))
-
-            tmp = df_final.copy()
-            tmp["Score"] = sc
-            tmp_sorted = tmp.sort_values("Score", ascending=False).head(10).reset_index(drop=True)
-            tmp_sorted.insert(0, "Rank", range(1, len(tmp_sorted) + 1))
-
-            display_cols = ["Rank", "Name", "Score"]
-            if "Age" in tmp_sorted.columns:
-                display_cols.insert(-1, "Age")
-
-            tiny = tmp_sorted[display_cols].copy()
-            tiny["Score"] = tiny["Score"].round(0).astype('Int64')
-
-            st.dataframe(tiny, hide_index=True, use_container_width=True)
-
-
-# Starting XI Section
-st.markdown("""
-<div class="info-box">
-    <strong>Formation Analysis:</strong><br>
-    Hungarian algorithm used to create the best starting 11, it also creates a secondary team with 0 overlap in players from the first team. Some ridiculous options occur like a DM being recommended as a ST but it should theoretically be true as long as their hidden attributes aren't terrible.
-</div>
-""", unsafe_allow_html=True)
-
-# Fixed Formation Setup
-st.markdown("### Meta Formation (4-2-3-1)")
-
-# Fixed formation lines with your desired layout
-formation_lines = [
-    ("GK", "GK"),
-    ("EMPTY", "EMPTY"),
-    ("RB", "DL/DR"),
-    ("CB", "CB"),
-    ("CB", "CB"),
-    ("LB", "DL/DR"),
-    ("EMPTY", "EMPTY"),
-    ("DM", "DM"),
-    ("DM", "DM"),
-    ("EMPTY", "EMPTY"),
-    ("AMR", "AML/AMR"),
-    ("AMC", "AMC"),
-    ("AML", "AML/AMR"),
-    ("EMPTY", "EMPTY"),
-    ("ST", "ST")
-]
-
-# Filter out EMPTY positions for the actual team selection
-positions = [(label, role) for label, role in formation_lines if role != "EMPTY"]
-
-n_players = len(df_final)
-n_positions = len(positions)
-player_names = df_final["Name"].astype(str).tolist()
-
-# Precompute role weight vectors
-role_weight_vectors = {}
-for _, role_key in positions:
-    if role_key not in role_weight_vectors: # Avoid re-computing for same role
-        rw = WEIGHTS_BY_ROLE.get(role_key, {})
-        role_weight_vectors[role_key] = np.array([float(rw.get(a, 0.0)) for a in available_attrs_final], dtype=float)
-
-# Compute score matrix
-score_matrix = np.zeros((n_players, n_positions), dtype=float)
-for i_idx in range(n_players):
-    player_attr_vals = attrs_norm_final.iloc[i_idx].values if len(available_attrs_final) > 0 else np.zeros((len(available_attrs_final),), dtype=float)
-    for p_idx, (_, role_key) in enumerate(positions):
-        w = role_weight_vectors[role_key]
-        score_matrix[i_idx, p_idx] = float(np.dot(player_attr_vals, w))
-
-# Hungarian algorithm assignment
-try:
-    from scipy.optimize import linear_sum_assignment
-except Exception:
-    linear_sum_assignment = None
-
-def choose_starting_xi(available_player_indices, current_score_matrix):
-    avail = list(available_player_indices)
-    num_avail = len(avail)
-    num_pos = current_score_matrix.shape[1]
-
-    if num_avail == 0 or num_pos == 0:
-        return {}
-
-    # Cost matrix for assignment
-    cost_matrix = -current_score_matrix[avail, :]
-
-    if linear_sum_assignment is None or num_avail < num_pos:
-        # Greedy fallback if scipy is missing or not enough players
-        chosen = {}
-        used_players = set()
-        for p_idx in range(num_pos):
-            best_player_idx = -1
-            best_score = -1e9
-            for i_idx in avail:
-                if i_idx not in used_players:
-                    score = current_score_matrix[i_idx, p_idx]
-                    if score > best_score:
-                        best_score = score
-                        best_player_idx = i_idx
-            if best_player_idx != -1:
-                chosen[p_idx] = best_player_idx
-                used_players.add(best_player_idx)
-        return chosen
+def get_color_class(score, team_avg, threshold=400):
+    """Get color class based on score relative to team average"""
+    diff = score - team_avg
+    
+    if diff >= threshold:
+        return "score-excellent"
+    elif diff <= -threshold:
+        return "score-poor"
     else:
-        row_ind, col_ind = linear_sum_assignment(cost_matrix)
-        chosen = {c: avail[r] for r, c in zip(row_ind, col_ind)}
-        return chosen
+        return "score-average"
 
-def render_xi(chosen_map, team_name="Team"):
-    rows = []
-    position_index = 0
+def create_formation_display(team_data, formation_name="Starting XI"):
+    """Create visual formation display"""
+    st.markdown(f"### {formation_name}")
     
-    # Fixed formation lines
-    formation_lines = [
-        ("GK", "GK"),
-        ("EMPTY", "EMPTY"),
-        ("RB", "DL/DR"),
-        ("CB", "CB"),
-        ("CB", "CB"),
-        ("LB", "DL/DR"),
-        ("EMPTY", "EMPTY"),
-        ("DM", "DM"),
-        ("DM", "DM"),
-        ("EMPTY", "EMPTY"),
-        ("AMR", "AML/AMR"),
-        ("AMC", "AMC"),
-        ("AML", "AML/AMR"),
-        ("EMPTY", "EMPTY"),
-        ("ST", "ST")
+    # Formation positions
+    formation_positions = [
+        "GK", "", "RB", "CB", "CB", "LB", "",
+        "DM", "DM", "",
+        "AMR", "AMC", "AML", "",
+        "ST"
     ]
     
-    # Build rows including empty spaces for visual formatting
-    for line_label, line_role in formation_lines:
-        if line_role == "EMPTY":
-            rows.append(("EMPTY", "---", 0.0, "EMPTY"))
+    # Create formation layout
+    formation_html = f"""
+    <div class="formation-container">
+        <h3 style="text-align: center; color: white; margin-bottom: 2rem;">{formation_name}</h3>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 600px; margin: 0 auto;">
+    """
+    
+    for i, pos in enumerate(formation_positions):
+        if pos == "":
+            formation_html += '<div style="height: 60px;"></div>'
         else:
-            if position_index in chosen_map:
-                p_idx = chosen_map[position_index]
-                name = player_names[p_idx]
-                sel_score = score_matrix[p_idx, position_index]
-                rows.append((line_label, name, sel_score, line_role))
+            if pos in team_data:
+                player = team_data[pos]
+                score = player.get('score', 0)
+                name = player.get('name', 'Unknown')
+                age = player.get('age', 'N/A')
+                
+                # Color based on score
+                color_class = get_color_class(score, team_data.get('team_avg', 0))
+                
+                formation_html += f"""
+                <div class="player-card">
+                    <div style="font-weight: bold; font-size: 0.9rem;">{name}</div>
+                    <div style="font-size: 0.8rem; color: #666;">{pos} | Age: {age}</div>
+                    <div class="{color_class}">{score:.1f}</div>
+                </div>
+                """
             else:
-                rows.append((line_label, "---", 0.0, line_role))
-            position_index += 1
+                formation_html += f"""
+                <div class="player-card" style="opacity: 0.3;">
+                    <div style="font-weight: bold;">{pos}</div>
+                    <div>No Player</div>
+                </div>
+                """
+    
+    formation_html += """
+        </div>
+    </div>
+    """
+    
+    st.markdown(formation_html, unsafe_allow_html=True)
 
-    team_total = sum(r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY")
-    placed_scores = [r[2] for r in rows if r[1] != "---" and r[0] != "EMPTY"]
-    team_avg = np.mean(placed_scores) if placed_scores else 0.0
-
-# Format as table
-    lines = [f"<div class='xi-formation'>"]
-    lines.append(f"<h3 style='text-align: center; margin-bottom: 1rem;'>{team_name}</h3>")
-
-    for pos_label, name, sel_score, role_key in rows:
-        if role_key == "EMPTY":
-            lines.append("<div style='height: 20px;'></div>")  # Empty space
-        else:
-            sel_score_int = int(round(sel_score))
+def solve_team_selection(df, positions_needed):
+    """Use Hungarian algorithm to solve optimal team selection"""
+    # Create cost matrix
+    players = df.index.tolist()
+    n_players = len(players)
+    n_positions = len(positions_needed)
+    
+    # Create cost matrix (negative scores because we want to maximize)
+    cost_matrix = np.zeros((n_players, n_positions))
+    
+    for i, player_idx in enumerate(players):
+        for j, position in enumerate(positions_needed):
+            score_col = f'{position}_Score'
+            if score_col in df.columns:
+                cost_matrix[i, j] = -df.loc[player_idx, score_col]
+            else:
+                cost_matrix[i, j] = 0
+    
+    # Solve using Hungarian algorithm
+    row_indices, col_indices = linear_sum_assignment(cost_matrix)
+    
+    # Create team selection
+    team = {}
+    used_players = set()
+    
+    for i, j in zip(row_indices, col_indices):
+        if i < len(players) and j < len(positions_needed):
+            player_idx = players[i]
+            position = positions_needed[j]
             
-            # Calculate color based on difference from team average
-            diff_from_avg = sel_score - team_avg
+            if player_idx not in used_players:
+                team[position] = {
+                    'name': df.loc[player_idx, 'Name'],
+                    'age': df.loc[player_idx, 'Age'],
+                    'score': df.loc[player_idx, f'{position}_Score'],
+                    'player_idx': player_idx
+                }
+                used_players.add(player_idx)
+    
+    return team, used_players
+
+def main():
+    st.markdown('<h1 class="main-header">⚽ Football Manager Player Analyzer</h1>', unsafe_allow_html=True)
+    
+    # Sidebar for file upload
+    st.sidebar.header("📁 Upload HTML Files")
+    uploaded_files = st.sidebar.file_uploader(
+        "Choose HTML files from Football Manager",
+        type=['html'],
+        accept_multiple_files=True,
+        help="Upload the HTML files exported from Football Manager"
+    )
+    
+    if uploaded_files:
+        # Process all uploaded files
+        all_players = []
+        
+        for uploaded_file in uploaded_files:
+            content = uploaded_file.read().decode('utf-8')
+            df = parse_html_file(content)
+            if not df.empty:
+                df = clean_and_process_data(df)
+                all_players.append(df)
+        
+        if all_players:
+            # Combine all dataframes
+            combined_df = pd.concat(all_players, ignore_index=True)
+            combined_df = clean_and_process_data(combined_df)
             
-            # Normalize difference to a 0-1 scale (400 points = full intensity)
-            intensity = min(abs(diff_from_avg) / 400.0, 1.0)
+            # Calculate position scores
+            combined_df = calculate_all_position_scores(combined_df)
             
-            # Calculate RGB values
-            if diff_from_avg >= 0:  # Above average - green
-                red = int(255 * (1 - intensity))
-                green = 255
-                blue = int(255 * (1 - intensity))
-            else:  # Below average - red
-                red = 255
-                green = int(255 * (1 - intensity))
-                blue = int(255 * (1 - intensity))
+            st.success(f"✅ Successfully loaded {len(combined_df)} unique players from {len(uploaded_files)} files")
             
-            name_color = f"rgb({red}, {green}, {blue})"
+            # Display player statistics
+            col1, col2, col3, col4 = st.columns(4)
             
-            lines.append(f"""<div style='display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; margin: 0.25rem 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-                <span style='font-weight: bold; min-width: 5rem; color: {name_color};'>{pos_label}</span>
-                <span style='font-weight: bold; flex-grow: 1; text-align: center; color: {name_color};'>{name}</span>
-                <span style='min-width: 4rem; text-align: right; color: {name_color};'>{sel_score_int} pts</span>
-            </div>""")
+            with col1:
+                st.metric("Total Players", len(combined_df))
+            
+            with col2:
+                avg_age = combined_df['Age'].mean()
+                st.metric("Average Age", f"{avg_age:.1f}")
+            
+            with col3:
+                total_value = combined_df['Transfer Value Numeric'].sum()
+                st.metric("Total Squad Value", f"€{total_value/1000000:.1f}M")
+            
+            with col4:
+                top_value = combined_df['Transfer Value Numeric'].max()
+                st.metric("Highest Value Player", f"€{top_value/1000000:.1f}M")
+            
+            # Create tabs for different views
+            tab1, tab2, tab3 = st.tabs(["📊 Player Rankings", "⚽ Starting XI", "🔄 Second XI"])
+            
+            with tab1:
+                st.header("Player Rankings by Position")
+                
+                # Position selector
+                selected_position = st.selectbox(
+                    "Select Position to View Rankings",
+                    list(POSITION_WEIGHTS.keys())
+                )
+                
+                if selected_position:
+                    score_col = f'{selected_position}_Score'
+                    if score_col in combined_df.columns:
+                        # Sort by position score
+                        ranked_players = combined_df.sort_values(score_col, ascending=False).head(20)
+                        
+                        # Create ranking table
+                        display_cols = ['Name', 'Age', 'Transfer Value'] + [f'{pos}_Score' for pos in POSITION_WEIGHTS.keys()]
+                        available_cols = [col for col in display_cols if col in ranked_players.columns]
+                        
+                        st.dataframe(
+                            ranked_players[available_cols].head(20),
+                            use_container_width=True,
+                            height=600
+                        )
+            
+            with tab2:
+                st.header("Optimal Starting XI")
+                
+                # Define formation positions
+                formation_positions = ['GK', 'DL/DR', 'CB', 'CB', 'WBL/WBR', 'DM', 'DM', 'ML/MR', 'MC', 'AML/AMR', 'AMC', 'ST']
+                
+                # Solve for starting XI
+                starting_team, used_players = solve_team_selection(combined_df, formation_positions)
+                
+                # Calculate team average
+                if starting_team:
+                    team_scores = [player['score'] for player in starting_team.values()]
+                    team_avg = np.mean(team_scores)
+                    starting_team['team_avg'] = team_avg
+                    
+                    # Display formation
+                    create_formation_display(starting_team, "Starting XI")
+                    
+                    # Display team statistics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Team Average Score", f"{team_avg:.1f}")
+                    with col2:
+                        st.metric("Total Team Value", f"€{sum(combined_df.loc[player['player_idx'], 'Transfer Value Numeric'] for player in starting_team.values() if 'player_idx' in player)/1000000:.1f}M")
+                    with col3:
+                        st.metric("Average Age", f"{np.mean([player['age'] for player in starting_team.values()]):.1f}")
+            
+            with tab3:
+                st.header("Second XI (Excluding Starting XI Players)")
+                
+                if 'used_players' in locals():
+                    # Filter out used players
+                    available_players = combined_df[~combined_df.index.isin(used_players)]
+                    
+                    if len(available_players) > 0:
+                        # Solve for second XI
+                        second_team, _ = solve_team_selection(available_players, formation_positions)
+                        
+                        if second_team:
+                            # Calculate team average
+                            team_scores = [player['score'] for player in second_team.values()]
+                            team_avg = np.mean(team_scores)
+                            second_team['team_avg'] = team_avg
+                            
+                            # Display formation
+                            create_formation_display(second_team, "Second XI")
+                            
+                            # Display team statistics
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Team Average Score", f"{team_avg:.1f}")
+                            with col2:
+                                st.metric("Total Team Value", f"€{sum(available_players.loc[player['player_idx'], 'Transfer Value Numeric'] for player in second_team.values() if 'player_idx' in player)/1000000:.1f}M")
+                            with col3:
+                                st.metric("Average Age", f"{np.mean([player['age'] for player in second_team.values()]):.1f}")
+                    else:
+                        st.warning("No available players for Second XI after selecting Starting XI")
+                else:
+                    st.info("Please generate Starting XI first")
+    
+    else:
+        st.info("👆 Please upload HTML files from Football Manager to get started!")
+        
+        # Show example of what the app does
+        st.markdown("""
+        ### What this app does:
+        
+        1. **📁 Upload HTML Files**: Upload exported player data from Football Manager
+        2. **📊 Analyze Players**: Calculate position-specific scores using weighted attributes
+        3. **⚽ Build Teams**: Use Hungarian algorithm to find optimal team selections
+        4. **🎨 Visual Display**: Beautiful formation displays with color-coded performance
+        5. **🔄 Multiple Teams**: Create both Starting XI and Second XI
+        
+        ### Features:
+        - **Weighted Scoring**: Each position has specific attribute weights
+        - **No Duplicates**: Automatically handles duplicate players (keeps highest value)
+        - **Color Coding**: Green for excellent, red for poor performance vs team average
+        - **Optimal Selection**: Hungarian algorithm ensures best possible team
+        - **Beautiful UI**: Modern, responsive design
+        """)
 
-    lines.append(f"""<div style='margin-top: 2rem; padding-top: 1rem; border-top: 2px solid rgba(255,255,255,0.3); text-align: center;'>
-        <strong>Team Total: {int(round(team_total))} | Average: {int(round(team_avg))}</strong>
-    </div>""")
-    lines.append("</div>")
-
-    return "".join(lines)
-
-# Generate both teams
-all_player_indices = list(range(n_players))
-first_choice = choose_starting_xi(all_player_indices, score_matrix)
-used_player_indices = set(first_choice.values())
-remaining_players = [i for i in all_player_indices if i not in used_player_indices]
-second_choice = choose_starting_xi(remaining_players, score_matrix)
-
-st.markdown("<br>", unsafe_allow_html=True)
-# Display both teams side by side
-col1, col2 = st.columns(2)
-
-with col1:
-    first_xi_html = render_xi(first_choice, "First XI")
-    st.markdown(first_xi_html, unsafe_allow_html=True)
-
-with col2:
-    second_xi_html = render_xi(second_choice, "Second XI")
-    st.markdown(second_xi_html, unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
